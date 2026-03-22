@@ -69,7 +69,7 @@ function setupDashboard() {
       if (statsTabBtn) statsTabBtn.click();
     } else {
       crudMenu.classList.remove('d-none');
-      loadConfigToUI(); // 📌 โหลดตารางตั้งค่าเวลาสำหรับ ADMIN
+      loadConfigToUI(); // โหลดตารางตั้งค่าเวลาสำหรับ ADMIN
     }
 
   } else if (safeRole === 'MENTOR') {
@@ -78,7 +78,7 @@ function setupDashboard() {
 
   } else {
     document.getElementById('trainee-view').classList.add('d-block');
-    loadAttendanceUI(); // 📌 โหลดปุ่มลงเวลาให้ TRAINEE
+    loadAttendanceUI(); // โหลดปุ่มลงเวลาให้ TRAINEE
   }
 }
 
@@ -382,7 +382,7 @@ async function handleExportCSV() {
 async function loadConfigToUI() {
   const tbody = document.getElementById('config-table-body');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div> กำลังดึงข้อมูลการตั้งค่า...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div> กำลังดึงข้อมูลการตั้งค่า...</td></tr>';
   const res = await callAPI('getRawAttendanceConfig');
 
   if (res.status === 'success') {
@@ -400,25 +400,46 @@ async function loadConfigToUI() {
           <td><input type="time" class="form-control form-control-sm config-start" value="${row[5]}"></td>
           <td><input type="time" class="form-control form-control-sm config-end" value="${row[6]}"></td>
           <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input config-active" type="checkbox" style="cursor:pointer;" ${isChecked}></div></td>
+          <td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="deleteConfigRow(this)" title="ลบข้อมูล"><i class="bi bi-trash3-fill"></i></button></td>
         </tr>
       `;
     });
-  } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
+  } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
 }
 
-// อัปเกรดระบบบันทึก พร้อมตัวดักจับ Error ป้องกันหน้าจอหมุนค้าง
+function addConfigRow() {
+  const tbody = document.getElementById('config-table-body');
+  if (!tbody) return;
+  const newId = 'CONF-EXTRA-' + Math.floor(Math.random() * 10000);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="d-none"><input type="hidden" class="config-id" value="${newId}"></td>
+    <td class="d-none"><input type="hidden" class="config-slotid" value="EXTRA"></td>
+    <td><span class="badge bg-info text-dark">EXTRA</span></td>
+    <td><input type="number" class="form-control form-control-sm text-center mx-auto config-day" value="1" style="width: 60px;"></td>
+    <td><input type="date" class="form-control form-control-sm config-date" value=""></td>
+    <td><input type="text" class="form-control form-control-sm config-label" value="รอบพิเศษ" placeholder="ชื่อรอบ..."></td>
+    <td><input type="time" class="form-control form-control-sm config-start" value="08:00"></td>
+    <td><input type="time" class="form-control form-control-sm config-end" value="16:00"></td>
+    <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input config-active" type="checkbox" style="cursor:pointer;" checked></div></td>
+    <td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="deleteConfigRow(this)" title="ลบข้อมูล"><i class="bi bi-trash3-fill"></i></button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function deleteConfigRow(btnElement) {
+  const row = btnElement.closest('tr');
+  row.remove();
+}
+
 async function saveConfigFromUI() {
   try {
     Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-
     const rows = document.querySelectorAll('#config-table-body tr');
     let newConfigData = [];
 
-    // วนลูปเก็บข้อมูลทีละแถว
     for (let tr of rows) {
-      // ป้องกันบั๊กแถวว่าง (Empty Row)
       if (!tr.querySelector('.config-id')) continue;
-
       const id = tr.querySelector('.config-id').value;
       const day = tr.querySelector('.config-day').value;
       const date = tr.querySelector('.config-date').value;
@@ -427,21 +448,14 @@ async function saveConfigFromUI() {
       const start = tr.querySelector('.config-start').value;
       const end = tr.querySelector('.config-end').value;
       const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
-
       newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
     }
 
-    // ยิง API ไปที่ Google Sheet
     const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
-
-    if (res.status === 'success') {
-      Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
-    } else {
-      Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
-    }
+    if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+    else Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
 
   } catch (error) {
-    // ถ้าระบบพังกลางคัน จะเด้งกล่องนี้แทนการหมุนค้าง
     console.error("Save Error: ", error);
     Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error');
   }

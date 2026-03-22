@@ -200,16 +200,22 @@
           <div class="card border-0 shadow-sm rounded-4 mt-4 border-start border-warning border-4">
             <div class="card-header bg-white fw-bold pt-3 pb-3 border-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
               <span class="text-dark"><i class="bi bi-calendar-range text-warning"></i> ตั้งค่าช่วงเวลาเปิด-ปิดระบบ (Attendance Config)</span>
-              <button class="btn btn-sm btn-warning rounded-pill px-4 shadow-sm text-dark fw-bold" onclick="saveConfigFromUI()">
-                <i class="bi bi-save"></i> บันทึกการตั้งค่า
-              </button>
+              
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm fw-bold" onclick="addConfigRow()">
+                  <i class="bi bi-plus-circle"></i> เพิ่มรอบเวลา
+                </button>
+                <button class="btn btn-sm btn-warning rounded-pill px-4 shadow-sm text-dark fw-bold" onclick="saveConfigFromUI()">
+                  <i class="bi bi-save"></i> บันทึกการตั้งค่า
+                </button>
+              </div>
             </div>
             <div class="card-body p-0 table-responsive">
               <table class="table table-hover align-middle mb-0 text-center" style="font-size: 0.9rem;">
                 <thead class="table-light">
                   <tr>
                     <th>รอบ</th><th>วันที่ (Day)</th><th>ว/ด/ป (YYYY-MM-DD)</th>
-                    <th class="text-start">ชื่อรอบที่จะแสดง</th><th>เวลาเริ่ม</th><th>เวลาสิ้นสุด</th><th>สถานะการใช้งาน</th>
+                    <th class="text-start">ชื่อรอบที่จะแสดง</th><th>เวลาเริ่ม</th><th>เวลาสิ้นสุด</th><th>สถานะ</th><th>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody id="config-table-body">
@@ -229,6 +235,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="script.js?v=7"></script> 
+  <script src="script.js?v=10"></script> 
 </body>
 </html>
