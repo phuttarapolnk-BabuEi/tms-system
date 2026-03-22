@@ -8,12 +8,15 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
+    /* CSS พื้นฐาน */
     body { background-color: #f4f6f9; display: flex; flex-direction: column; min-height: 100vh; font-family: 'Sarabun', sans-serif;}
-    .app-view { display: none; }
     main { flex: 1; }
+    /* .app-view ใช้สำหรับซ่อน/แสดงหน้าจอ (SPA Logic) */
+    .app-view { display: none; } 
   </style>
 </head>
 <body>
+
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm" id="main-nav" style="display:none;">
     <div class="container-fluid">
       <a class="navbar-brand fw-bold" href="#"><i class="bi bi-mortarboard-fill"></i> ระบบ TMS</a>
@@ -26,6 +29,7 @@
   </nav>
 
   <main class="container py-4">
+    
     <div id="login-view" class="app-view d-block" style="max-width: 400px; margin: 80px auto;">
       <div class="card shadow-sm border-0 rounded-4">
         <div class="card-body p-5 text-center">
@@ -65,62 +69,89 @@
     </div>
 
     <div id="admin-view" class="app-view">
-      <h4 class="mb-4 text-secondary"><i class="bi bi-gear-fill"></i> แดชบอร์ดการจัดการ</h4>
-      <ul class="nav nav-pills mb-4" id="adminTabs" role="tablist">
-        <li class="nav-item"><a class="nav-link active rounded-pill px-4" data-bs-toggle="pill" href="#stats">สถิติภาพรวม</a></li>
-        <li class="nav-item"><a class="nav-link rounded-pill px-4" data-bs-toggle="pill" href="#crud">จัดการข้อมูล</a></li>
+      <h4 class="mb-4 text-secondary"><i class="bi bi-pie-chart-fill"></i> แดชบอร์ดติดตามผลการดำเนินงาน</h4>
+      
+      <ul class="nav nav-pills mb-4 bg-white p-2 rounded-pill shadow-sm" id="adminTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#stats">📊 สถิติภาพรวม</a></li>
+        <li class="nav-item" id="nav-crud-menu"><a class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#crud">⚙️ จัดการข้อมูล (Admin)</a></li>
       </ul>
+      
       <div class="tab-content">
         <div class="tab-pane fade show active" id="stats">
-          <div class="row g-4 mb-4">
-            <div class="col-lg-5">
-              <div class="card shadow-sm border-0 h-100 rounded-4">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center border-0 pt-3">
-                  <span>สัดส่วนการลงเวลา</span>
-                  <button class="btn btn-sm btn-light rounded-circle" onclick="fetchPieChartData()"><i class="bi bi-arrow-clockwise"></i></button>
-                </div>
-                <div class="card-body"><canvas id="attendancePieChart" style="max-height: 250px;"></canvas></div>
-              </div>
-            </div>
-            <div class="col-lg-7">
-              <div class="card shadow-sm border-0 h-100 border-start border-danger border-4 rounded-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3">
-                  <span class="fw-bold text-danger"><i class="bi bi-person-x-fill"></i> ผู้ที่ยังไม่มาลงเวลา</span>
-                  <div class="d-flex gap-2">
-                    <select id="missing-day" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="1">วันที่ 1</option></select>
-                    <select id="missing-time" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option></select>
+          
+          <ul class="nav nav-tabs mb-4 border-bottom-0" id="statsSubTabs" role="tablist">
+            <li class="nav-item"><a class="nav-link active fw-bold" data-bs-toggle="tab" href="#sub-attendance">การลงเวลา</a></li>
+            <li class="nav-item"><a class="nav-link fw-bold" data-bs-toggle="tab" href="#sub-evaluate">การประเมินวิทยากร</a></li>
+            <li class="nav-item"><a class="nav-link fw-bold" data-bs-toggle="tab" href="#sub-satisfaction">ความพึงพอใจโครงการ</a></li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="sub-attendance">
+              <div class="row g-4 mb-4">
+                <div class="col-lg-5">
+                  <div class="card shadow-sm border-0 h-100 rounded-4">
+                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center border-0 pt-3">
+                      <span>สัดส่วนการลงเวลาล่าสุด</span>
+                      <button class="btn btn-sm btn-light rounded-circle" onclick="fetchPieChartData()"><i class="bi bi-arrow-clockwise"></i></button>
+                    </div>
+                    <div class="card-body"><canvas id="attendancePieChart" style="max-height: 250px;"></canvas></div>
                   </div>
                 </div>
-                <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
-                  <table class="table table-sm table-hover mb-0">
-                    <thead class="table-light sticky-top"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>กลุ่ม</th></tr></thead>
-                    <tbody id="missing-table-body"></tbody>
-                  </table>
+                <div class="col-lg-7">
+                  <div class="card shadow-sm border-0 h-100 border-start border-danger border-4 rounded-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3">
+                      <span class="fw-bold text-danger"><i class="bi bi-person-x-fill"></i> ผู้ที่ยังไม่มาลงเวลา</span>
+                      <div class="d-flex gap-2">
+                        <select id="missing-day" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option></select>
+                        <select id="missing-time" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option></select>
+                      </div>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
+                      <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>กลุ่มเป้าหมาย</th></tr></thead>
+                        <tbody id="missing-table-body"></tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+            
+            <div class="tab-pane fade" id="sub-evaluate"><div class="card shadow-sm border-0 rounded-4 p-5 text-center text-muted"><h5><i class="bi bi-bar-chart-line"></i> ข้อมูลการประเมินวิทยากรจะแสดงผลที่นี่</h5></div></div>
+            <div class="tab-pane fade" id="sub-satisfaction"><div class="card shadow-sm border-0 rounded-4 p-5 text-center text-muted"><h5><i class="bi bi-emoji-smile"></i> สรุปผลความพึงพอใจโครงการจะแสดงผลที่นี่</h5></div></div>
           </div>
-          <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3 pb-3">
-              <span class="fw-bold text-success"><i class="bi bi-list-check"></i> ตารางความก้าวหน้า</span>
-              <div class="input-group input-group-sm w-auto shadow-sm rounded-pill overflow-hidden">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                <input type="text" id="search-progress" class="form-control border-start-0" placeholder="พิมพ์ชื่อเพื่อค้นหา..." onkeyup="filterProgressTable()">
+
+          <div class="card shadow-sm border-0 rounded-4 mt-4">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center border-0 pt-3 pb-3 gap-2">
+              <span class="fw-bold text-success"><i class="bi bi-list-check"></i> ตารางความก้าวหน้าผู้เข้าอบรม</span>
+              <div class="d-flex gap-2 w-auto">
+                <select id="filter-group-target" class="form-select form-select-sm rounded-pill shadow-sm" onchange="filterProgressTable()">
+                  <option value="ALL">ทุกกลุ่มเป้าหมาย</option><option value="1">กลุ่ม 1</option><option value="2">กลุ่ม 2</option>
+                </select>
+                <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden" style="max-width: 200px;">
+                  <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                  <input type="text" id="search-progress" class="form-control border-start-0" placeholder="ค้นหาชื่อ, รหัส..." onkeyup="filterProgressTable()">
+                </div>
               </div>
             </div>
             <div class="card-body p-0 table-responsive">
               <table class="table table-striped mb-0">
                 <thead class="table-dark"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>กลุ่ม</th></tr></thead>
-                <tbody id="progress-table-body"></tbody>
-              </table>
+                <tbody id="progress-table-body"></tbody> </table>
+            </div>
+            <div class="card-footer bg-white border-0 d-flex flex-wrap justify-content-between align-items-center py-3">
+              <small class="text-muted" id="pagination-info">แสดง 0 ถึง 0 จาก 0 รายการ</small>
+              <nav><ul class="pagination pagination-sm mb-0" id="pagination-controls"></ul></nav>
             </div>
           </div>
         </div>
+
         <div class="tab-pane fade" id="crud">
           <div class="row g-4">
             <div class="col-md-6">
               <div class="card border-0 shadow-sm p-4 text-center rounded-4 h-100">
                 <h5 class="text-primary fw-bold mb-3"><i class="bi bi-cloud-upload"></i> นำเข้าฐานข้อมูล (CSV)</h5>
+                <p class="text-muted small">รองรับการอัปโหลดไฟล์ข้อสอบและแบบประเมิน</p>
                 <input type="file" class="form-control mb-3" id="csvFileInput" accept=".csv">
                 <button class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="handleImportCSV()">เริ่มกระบวนการนำเข้า</button>
               </div>
@@ -128,6 +159,7 @@
             <div class="col-md-6">
               <div class="card border-0 shadow-sm p-4 text-center rounded-4 h-100">
                 <h5 class="text-success fw-bold mb-3"><i class="bi bi-cloud-download"></i> ส่งออกรายงาน (CSV)</h5>
+                <p class="text-muted small">ดาวน์โหลดข้อมูลประวัติการลงเวลาทั้งหมด</p>
                 <button class="btn btn-success rounded-pill px-4 mt-auto shadow-sm" onclick="handleExportCSV()">ดาวน์โหลดไฟล์รายงาน</button>
               </div>
             </div>
