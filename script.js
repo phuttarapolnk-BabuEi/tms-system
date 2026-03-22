@@ -3,6 +3,7 @@
 // ==========================================
 const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec"; 
 
+// ตัวแปร Global
 let currentUser = null;
 let globalProgressData = [];
 let filteredProgressData = [];
@@ -149,7 +150,6 @@ async function fetchMentorData() {
 }
 
 function renderMentorChart() {
-  // สรุปยอดลงเวลาแยกตาม Time Slot สำหรับทำกราฟแท่ง
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
   globalMentorData.forEach(log => {
     if(counts[log.time_slot] !== undefined) counts[log.time_slot]++;
@@ -208,7 +208,6 @@ function renderMentorPaginatedTable() {
   const endIdx = startIdx + rowsPerPage;
   const paginatedItems = filteredMentorData.slice(startIdx, endIdx);
 
-  // การแปลคำศัพท์ให้เป็นภาษาไทย
   const timeTranslates = { 'Morning': 'เช้า', 'Afternoon': 'บ่าย', 'Evening': 'เย็น', 'Checkout': 'สะท้อนผล' };
 
   paginatedItems.forEach(log => {
@@ -217,7 +216,6 @@ function renderMentorPaginatedTable() {
 
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(endIdx, filteredMentorData.length)} จากทั้งหมด ${filteredMentorData.length} รายการ`;
   
-  // Render Pagination Buttons
   const ul = document.getElementById('mentor-pagination-controls');
   ul.innerHTML = '';
   ul.innerHTML += `<li class="page-item ${mentorCurrentPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changeMentorPage(${mentorCurrentPage - 1}); return false;">ก่อนหน้า</a></li>`;
