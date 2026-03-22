@@ -41,29 +41,37 @@
       </div>
     </div>
 
-    <div id="trainee-view" class="app-view">
-      <h4 class="mb-4 text-secondary"><i class="bi bi-person-badge"></i> พื้นที่สำหรับผู้เข้าอบรม</h4>
-      <div class="row g-4">
-        <div class="col-md-6">
-          <div class="card shadow-sm border-0 border-top border-success border-4 h-100">
-            <div class="card-header bg-white fw-bold"><i class="bi bi-clock-history"></i> ระบบลงเวลา (Attendance)</div>
-            <div class="card-body">
-              <button class="btn btn-outline-primary m-1" onclick="checkInModal('1', 'Morning')">เช้า (วันที่ 1)</button>
-              <button class="btn btn-outline-warning m-1" onclick="checkInModal('1', 'Afternoon')">บ่าย (วันที่ 1)</button>
-              <button class="btn btn-outline-danger m-1" onclick="checkInModal('1', 'Evening')">เย็น (วันที่ 1)</button>
+      <div id="trainee-view" class="app-view">
+            <h4 class="mb-4 text-secondary"><i class="bi bi-person-badge"></i> พื้นที่สำหรับผู้เข้าอบรม</h4>
+            <div class="row g-4">
+              
+              <div class="col-md-6">
+                <div class="card shadow-sm border-0 border-top border-success border-4 h-100">
+                  <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history"></i> ระบบลงเวลา (Attendance)</span>
+                    <button class="btn btn-sm btn-light rounded-circle" onclick="loadAttendanceUI()"><i class="bi bi-arrow-clockwise"></i></button>
+                  </div>
+                  <div class="card-body">
+                    <p class="text-muted small mb-2"><i class="bi bi-info-circle"></i> ปุ่มลงเวลาจะปรากฏขึ้นตามช่วงเวลาที่กำหนดเท่านั้น</p>
+                    
+                    <div id="attendance-buttons-container">
+                      </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="card shadow-sm border-0 border-top border-info border-4 h-100">
+                  <div class="card-header bg-white fw-bold"><i class="bi bi-ui-checks"></i> ภาระงานและแบบประเมิน</div>
+                  <div class="card-body d-flex flex-column justify-content-center">
+                    <button class="btn btn-info text-white shadow-sm" onclick="openSurveyModal()"><i class="bi bi-clipboard2-check"></i> ทำแบบประเมินโครงการ</button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
-        </div>
-        <div class="col-md-6">
-          <div class="card shadow-sm border-0 border-top border-info border-4 h-100">
-            <div class="card-header bg-white fw-bold"><i class="bi bi-ui-checks"></i> ภาระงานและแบบประเมิน</div>
-            <div class="card-body d-flex flex-column justify-content-center">
-              <button class="btn btn-info text-white shadow-sm" onclick="openSurveyModal()"><i class="bi bi-clipboard2-check"></i> ทำแบบประเมินโครงการ</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div id="mentor-view" class="app-view">
       <h4 class="mb-4 text-secondary"><i class="bi bi-people-fill"></i> แดชบอร์ดวิทยากรพี่เลี้ยง</h4>
@@ -206,6 +214,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="script.js?v=4"></script> 
+  <script src="script.js?v=6"></script> 
 </body>
 </html>
