@@ -379,6 +379,7 @@ async function handleExportCSV() {
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
+// 📌 [อัปเดต] โหลดตารางพร้อมแปลงช่องรหัสรอบให้เป็น Dropdown
 async function loadConfigToUI() {
   const tbody = document.getElementById('config-table-body');
   if (!tbody) return;
@@ -392,8 +393,14 @@ async function loadConfigToUI() {
       tbody.innerHTML += `
         <tr>
           <td class="d-none"><input type="hidden" class="config-id" value="${row[0]}"></td>
-          <td class="d-none"><input type="hidden" class="config-slotid" value="${row[3]}"></td>
-          <td><span class="badge bg-secondary">${row[3]}</span></td>
+          <td>
+            <select class="form-select form-select-sm config-slotid mx-auto text-center fw-bold text-secondary" style="width: 110px;">
+              <option value="Morning" ${row[3] === 'Morning' ? 'selected' : ''}>Morning</option>
+              <option value="Afternoon" ${row[3] === 'Afternoon' ? 'selected' : ''}>Afternoon</option>
+              <option value="Evening" ${row[3] === 'Evening' ? 'selected' : ''}>Evening</option>
+              <option value="Checkout" ${row[3] === 'Checkout' ? 'selected' : ''}>Checkout</option>
+            </select>
+          </td>
           <td><input type="number" class="form-control form-control-sm text-center mx-auto config-day" value="${row[1]}" style="width: 60px;"></td>
           <td><input type="date" class="form-control form-control-sm config-date" value="${row[2]}"></td>
           <td><input type="text" class="form-control form-control-sm config-label" value="${row[4]}"></td>
@@ -407,18 +414,25 @@ async function loadConfigToUI() {
   } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
 }
 
+// 📌 [อัปเดต] กดเพิ่มแถว จะสร้างแถวใหม่ที่เป็น Dropdown 
 function addConfigRow() {
   const tbody = document.getElementById('config-table-body');
   if (!tbody) return;
-  const newId = 'CONF-EXTRA-' + Math.floor(Math.random() * 10000);
+  const newId = 'CONF-NEW-' + Math.floor(Math.random() * 10000);
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="d-none"><input type="hidden" class="config-id" value="${newId}"></td>
-    <td class="d-none"><input type="hidden" class="config-slotid" value="EXTRA"></td>
-    <td><span class="badge bg-info text-dark">EXTRA</span></td>
+    <td>
+      <select class="form-select form-select-sm config-slotid border-primary mx-auto text-center fw-bold text-primary" style="width: 110px;">
+        <option value="Morning">Morning</option>
+        <option value="Afternoon">Afternoon</option>
+        <option value="Evening">Evening</option>
+        <option value="Checkout">Checkout</option>
+      </select>
+    </td>
     <td><input type="number" class="form-control form-control-sm text-center mx-auto config-day" value="1" style="width: 60px;"></td>
     <td><input type="date" class="form-control form-control-sm config-date" value=""></td>
-    <td><input type="text" class="form-control form-control-sm config-label" value="รอบพิเศษ" placeholder="ชื่อรอบ..."></td>
+    <td><input type="text" class="form-control form-control-sm config-label" value="รอบใหม่" placeholder="ชื่อรอบ..."></td>
     <td><input type="time" class="form-control form-control-sm config-start" value="08:00"></td>
     <td><input type="time" class="form-control form-control-sm config-end" value="16:00"></td>
     <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input config-active" type="checkbox" style="cursor:pointer;" checked></div></td>
@@ -443,6 +457,7 @@ async function saveConfigFromUI() {
       const id = tr.querySelector('.config-id').value;
       const day = tr.querySelector('.config-day').value;
       const date = tr.querySelector('.config-date').value;
+      // ตอนนี้ดึงค่า value ออกมาจาก Dropdown select โดยตรงได้เลย
       const slotId = tr.querySelector('.config-slotid').value;
       const label = tr.querySelector('.config-label').value;
       const start = tr.querySelector('.config-start').value;
