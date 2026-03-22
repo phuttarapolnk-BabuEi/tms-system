@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Training Management System (TMS)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body { background-color: #f4f6f9; display: flex; flex-direction: column; min-height: 100vh; font-family: 'Sarabun', sans-serif;}
+    .app-view { display: none; }
+    main { flex: 1; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm" id="main-nav" style="display:none;">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="#"><i class="bi bi-mortarboard-fill"></i> ระบบ TMS</a>
+      <div class="d-flex text-white align-items-center">
+        <span id="display-user-name" class="me-3 fw-bold"></span>
+        <span id="display-user-role" class="badge bg-warning text-dark me-3"></span>
+        <button class="btn btn-sm btn-outline-light" onclick="logout()"><i class="bi bi-box-arrow-right"></i> ออกระบบ</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4">
+    <div id="login-view" class="app-view d-block" style="max-width: 400px; margin: 80px auto;">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-5 text-center">
+          <div class="mb-4 text-primary"><i class="bi bi-person-bounding-box" style="font-size: 3rem;"></i></div>
+          <h4 class="mb-4 fw-bold">ลงชื่อเข้าใช้งานระบบ</h4>
+          <div class="input-group mb-4 shadow-sm">
+            <span class="input-group-text bg-white"><i class="bi bi-credit-card-2-front"></i></span>
+            <input type="text" id="input-personal-id" class="form-control border-start-0 pl-0" placeholder="เลขประจำตัวประชาชน 13 หลัก" onkeypress="if(event.key === 'Enter') handleLogin()">
+          </div>
+          <button class="btn btn-primary w-100 py-2 rounded-pill fw-bold shadow-sm" onclick="handleLogin()">เข้าสู่ระบบ</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="trainee-view" class="app-view">
+      <h4 class="mb-4 text-secondary"><i class="bi bi-person-badge"></i> พื้นที่สำหรับผู้เข้าอบรม</h4>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 border-top border-success border-4 h-100">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-clock-history"></i> ระบบลงเวลา (Attendance)</div>
+            <div class="card-body">
+              <button class="btn btn-outline-primary m-1" onclick="checkInModal('1', 'Morning')">เช้า (วันที่ 1)</button>
+              <button class="btn btn-outline-warning m-1" onclick="checkInModal('1', 'Afternoon')">บ่าย (วันที่ 1)</button>
+              <button class="btn btn-outline-danger m-1" onclick="checkInModal('1', 'Evening')">เย็น (วันที่ 1)</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 border-top border-info border-4 h-100">
+            <div class="card-header bg-white fw-bold"><i class="bi bi-ui-checks"></i> ภาระงานและแบบประเมิน</div>
+            <div class="card-body d-flex flex-column justify-content-center">
+              <button class="btn btn-info text-white shadow-sm" onclick="openSurveyModal()"><i class="bi bi-clipboard2-check"></i> ทำแบบประเมินโครงการ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-view" class="app-view">
+      <h4 class="mb-4 text-secondary"><i class="bi bi-gear-fill"></i> แดชบอร์ดการจัดการ</h4>
+      <ul class="nav nav-pills mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active rounded-pill px-4" data-bs-toggle="pill" href="#stats">สถิติภาพรวม</a></li>
+        <li class="nav-item"><a class="nav-link rounded-pill px-4" data-bs-toggle="pill" href="#crud">จัดการข้อมูล</a></li>
+      </ul>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="stats">
+          <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+              <div class="card shadow-sm border-0 h-100 rounded-4">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center border-0 pt-3">
+                  <span>สัดส่วนการลงเวลา</span>
+                  <button class="btn btn-sm btn-light rounded-circle" onclick="fetchPieChartData()"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+                <div class="card-body"><canvas id="attendancePieChart" style="max-height: 250px;"></canvas></div>
+              </div>
+            </div>
+            <div class="col-lg-7">
+              <div class="card shadow-sm border-0 h-100 border-start border-danger border-4 rounded-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3">
+                  <span class="fw-bold text-danger"><i class="bi bi-person-x-fill"></i> ผู้ที่ยังไม่มาลงเวลา</span>
+                  <div class="d-flex gap-2">
+                    <select id="missing-day" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="1">วันที่ 1</option></select>
+                    <select id="missing-time" class="form-select form-select-sm rounded-pill" onchange="fetchMissingData()"><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option></select>
+                  </div>
+                </div>
+                <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
+                  <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light sticky-top"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>กลุ่ม</th></tr></thead>
+                    <tbody id="missing-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3 pb-3">
+              <span class="fw-bold text-success"><i class="bi bi-list-check"></i> ตารางความก้าวหน้า</span>
+              <div class="input-group input-group-sm w-auto shadow-sm rounded-pill overflow-hidden">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="search-progress" class="form-control border-start-0" placeholder="พิมพ์ชื่อเพื่อค้นหา..." onkeyup="filterProgressTable()">
+              </div>
+            </div>
+            <div class="card-body p-0 table-responsive">
+              <table class="table table-striped mb-0">
+                <thead class="table-dark"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>กลุ่ม</th></tr></thead>
+                <tbody id="progress-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="crud">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm p-4 text-center rounded-4 h-100">
+                <h5 class="text-primary fw-bold mb-3"><i class="bi bi-cloud-upload"></i> นำเข้าฐานข้อมูล (CSV)</h5>
+                <input type="file" class="form-control mb-3" id="csvFileInput" accept=".csv">
+                <button class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="handleImportCSV()">เริ่มกระบวนการนำเข้า</button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm p-4 text-center rounded-4 h-100">
+                <h5 class="text-success fw-bold mb-3"><i class="bi bi-cloud-download"></i> ส่งออกรายงาน (CSV)</h5>
+                <button class="btn btn-success rounded-pill px-4 mt-auto shadow-sm" onclick="handleExportCSV()">ดาวน์โหลดไฟล์รายงาน</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-dark text-white text-center py-3 mt-auto">
+    <div class="container small">พัฒนาโดย &copy; 2026 | นายภัทรพล แก้วเสนา ศึกษานิเทศก์ สพม.พิษณุโลก อุตรดิตถ์</div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
