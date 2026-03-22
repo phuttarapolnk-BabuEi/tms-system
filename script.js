@@ -406,23 +406,43 @@ async function loadConfigToUI() {
   } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
 }
 
+// อัปเกรดระบบบันทึก พร้อมตัวดักจับ Error ป้องกันหน้าจอหมุนค้าง
 async function saveConfigFromUI() {
-  Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  const rows = document.querySelectorAll('#config-table-body tr');
-  let newConfigData = [];
-  rows.forEach(tr => {
-    const id = tr.querySelector('.config-id').value;
-    const day = tr.querySelector('.config-day').value;
-    const date = tr.querySelector('.config-date').value;
-    const slotId = tr.querySelector('.config-slotid').value;
-    const label = tr.querySelector('.config-label').value;
-    const start = tr.querySelector('.config-start').value;
-    const end = tr.querySelector('.config-end').value;
-    const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
-    newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
-  });
+  try {
+    Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
-  const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
-  if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
-  else Swal.fire('ข้อผิดพลาด', res.message, 'error');
+    const rows = document.querySelectorAll('#config-table-body tr');
+    let newConfigData = [];
+
+    // วนลูปเก็บข้อมูลทีละแถว
+    for (let tr of rows) {
+      // ป้องกันบั๊กแถวว่าง (Empty Row)
+      if (!tr.querySelector('.config-id')) continue;
+
+      const id = tr.querySelector('.config-id').value;
+      const day = tr.querySelector('.config-day').value;
+      const date = tr.querySelector('.config-date').value;
+      const slotId = tr.querySelector('.config-slotid').value;
+      const label = tr.querySelector('.config-label').value;
+      const start = tr.querySelector('.config-start').value;
+      const end = tr.querySelector('.config-end').value;
+      const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
+
+      newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
+    }
+
+    // ยิง API ไปที่ Google Sheet
+    const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
+
+    if (res.status === 'success') {
+      Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+    } else {
+      Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
+    }
+
+  } catch (error) {
+    // ถ้าระบบพังกลางคัน จะเด้งกล่องนี้แทนการหมุนค้าง
+    console.error("Save Error: ", error);
+    Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error');
+  }
 }
