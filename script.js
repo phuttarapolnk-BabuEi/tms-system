@@ -3,12 +3,7 @@
 // ==========================================
 const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
 
-// ==========================================
-// 📌 2. ตัวแปรส่วนกลาง (Global State)
-// ==========================================
 let currentUser = null;
-
-// ตัวแปรสำหรับ Admin/Staff Dashboard
 let globalProgressData = [];
 let filteredProgressData = [];
 let pieChartInstance = null;
@@ -16,15 +11,11 @@ let chartUpdateInterval = null;
 let currentPage = 1;
 const rowsPerPage = 10;
 
-// ตัวแปรสำหรับ Mentor Dashboard
 let globalMentorData = [];
 let filteredMentorData = [];
 let mentorChartInstance = null;
 let mentorCurrentPage = 1;
 
-// ==========================================
-// 📌 3. ฟังก์ชันสื่อสารกับ Backend (API Client)
-// ==========================================
 async function callAPI(action, payload = {}) {
   try {
     const response = await fetch(API_URL, {
@@ -33,14 +24,9 @@ async function callAPI(action, payload = {}) {
       body: JSON.stringify({ action: action, payload: payload })
     });
     return await response.json();
-  } catch (error) {
-    return { status: 'error', message: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต" };
-  }
+  } catch (error) { return { status: 'error', message: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้" }; }
 }
 
-// ==========================================
-// 📌 4. ระบบยืนยันตัวตนและการเข้าถึง (Auth & Routing)
-// ==========================================
 async function handleLogin() {
   const personalId = document.getElementById('input-personal-id').value.trim();
   if (!personalId) return Swal.fire('แจ้งเตือน', 'กรุณากรอกรหัสประจำตัว', 'warning');
@@ -57,33 +43,33 @@ async function handleLogin() {
   }
 }
 
+// ----------------------------------------
+// ระบบ Routing หน้าจอตาม Role
+// ----------------------------------------
 function setupDashboard() {
   document.getElementById('login-view').classList.remove('d-block');
   document.getElementById('main-nav').style.display = 'block';
 
-  // ล้างช่องว่างและปรับเป็นตัวพิมพ์ใหญ่ป้องกันบั๊กจากไฟล์ CSV
   const safeRole = currentUser.role ? currentUser.role.toString().trim().toUpperCase() : 'TRAINEE';
-
   document.getElementById('display-user-name').innerText = currentUser.name;
   document.getElementById('display-user-role').innerText = safeRole;
 
-  // ปิดทุกหน้าจอไปก่อน
   document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
 
-  // 🔀 ตรรกะการแยกหน้าจอ (Routing Logic)
   if (safeRole === 'ADMIN' || safeRole === 'STAFF') {
     document.getElementById('admin-view').classList.add('d-block');
     startRealtimeDashboard();
     fetchProgressData();
 
-    // STAFF จะมองไม่เห็นแท็บจัดการข้อมูล (CRUD)
     const crudMenu = document.getElementById('nav-crud-menu');
     const statsTabBtn = document.querySelector('a[href="#stats"]');
+
     if (safeRole === 'STAFF') {
       crudMenu.classList.add('d-none');
-      if (statsTabBtn) statsTabBtn.click(); // บังคับให้สลับมาแท็บสถิติเสมอ
+      if (statsTabBtn) statsTabBtn.click();
     } else {
       crudMenu.classList.remove('d-none');
+      loadConfigToUI(); // 📌 โหลดตารางตั้งค่าเวลาสำหรับ ADMIN
     }
 
   } else if (safeRole === 'MENTOR') {
@@ -91,9 +77,8 @@ function setupDashboard() {
     fetchMentorData();
 
   } else {
-    // สำหรับ TRAINEE (ผู้เข้าอบรม)
     document.getElementById('trainee-view').classList.add('d-block');
-    loadAttendanceUI(); // โหลดปุ่มลงเวลาตามช่วงเวลาจริงของเซิร์ฟเวอร์
+    loadAttendanceUI(); // 📌 โหลดปุ่มลงเวลาให้ TRAINEE
   }
 }
 
@@ -106,14 +91,12 @@ function logout() {
   document.getElementById('input-personal-id').value = '';
 }
 
-// ==========================================
-// 📌 5. ระบบของผู้เข้าอบรม (Trainee Features)
-// ==========================================
-
-// [ระบบสร้างปุ่มลงเวลาอัตโนมัติตาม Server Time]
+// ----------------------------------------
+// ระบบ Trainee (ลงเวลาอัตโนมัติ)
+// ----------------------------------------
 async function loadAttendanceUI() {
   const container = document.getElementById('attendance-buttons-container');
-  if (!container) return; // ดักจับเผื่อหา div ไม่เจอ
+  if (!container) return;
 
   container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> <span class="small text-muted">กำลังซิงค์เวลาเซิร์ฟเวอร์...</span></div>';
 
@@ -123,24 +106,26 @@ async function loadAttendanceUI() {
     container.innerHTML = '';
     const { schedule, serverDate, serverTime } = res;
 
+    if (schedule.length === 0) {
+      container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>';
+      return;
+    }
+
     schedule.forEach(day => {
       let html = `<div class="mb-3 border-bottom pb-2">
                     <h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${day.date})</span></h6>
                     <div class="d-flex flex-wrap gap-2">`;
 
       day.slots.forEach(slot => {
-        // เงื่อนไข: วันที่ต้องตรงกัน และเวลาต้องอยู่ระหว่าง start ถึง end
         const isToday = (day.date === serverDate);
         const isTimeValid = (serverTime >= slot.start && serverTime <= slot.end);
         const isActive = isToday && isTimeValid;
 
         if (isActive) {
-          // ปุ่มสีเขียว (กดได้)
           html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')">
                      <i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small>
                    </button>`;
         } else {
-          // ปุ่มสีเทา (กดไม่ได้)
           html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled>
                      <i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small>
                    </button>`;
@@ -150,93 +135,59 @@ async function loadAttendanceUI() {
       container.innerHTML += html;
     });
   } else {
-    container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ: ${res.message}</div>`;
+    container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ</div>`;
   }
 }
 
-// [ฟังก์ชันส่งบันทึกเวลา]
 async function checkInModal(dayNo, timeSlot) {
-  const { value: note } = await Swal.fire({
-    title: `ลงเวลา (${timeSlot})`,
-    input: 'textarea',
-    inputPlaceholder: 'พิมพ์เป้าหมาย / การสะท้อนผล...',
-    showCancelButton: true,
-    confirmButtonText: '<i class="bi bi-save"></i> บันทึกข้อมูล'
-  });
-
+  const { value: note } = await Swal.fire({ title: `ลงเวลา (${timeSlot})`, input: 'textarea', inputPlaceholder: 'พิมพ์เป้าหมาย/สะท้อนผล...', showCancelButton: true, confirmButtonText: 'บันทึกเวลา' });
   if (note !== undefined) {
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const res = await callAPI('recordAttendance', { personalId: currentUser.personal_id, dayNo: dayNo, timeSlot: timeSlot, note: note });
     if (res.status === 'success') {
       Swal.fire('สำเร็จ', res.message, 'success');
-      loadAttendanceUI(); // โหลด UI ใหม่เผื่อเวลาหมดพอดี
+      loadAttendanceUI();
     } else {
       Swal.fire('แจ้งเตือน', res.message, 'warning');
     }
   }
 }
 
-// [ระบบสร้างแบบประเมินอัตโนมัติ (Dynamic Survey)]
 async function openSurveyModal() {
   Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: 'SURVEY' });
-  if (res.status === 'success') {
-    Swal.close();
-    renderSurveyUI(res.data);
-  } else {
-    Swal.fire('ข้อผิดพลาด', res.message, 'error');
-  }
+  if (res.status === 'success') { Swal.close(); renderSurveyUI(res.data); } else Swal.fire('ข้อผิดพลาด', res.message, 'error');
 }
 
 function renderSurveyUI(surveyData) {
-  const groupedData = surveyData.reduce((acc, curr) => {
-    if (!acc[curr.q_category]) acc[curr.q_category] = [];
-    acc[curr.q_category].push(curr);
-    return acc;
-  }, {});
-
+  const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   let html = '<form id="satisfactionForm" class="text-start" style="font-size: 0.95rem;">';
   let sectionNumber = 1;
-
   for (const [category, questions] of Object.entries(groupedData)) {
     html += `<div class="mt-4 mb-3 border-bottom border-2 border-primary pb-2"><h6 class="fw-bold text-primary mb-0">หมวดที่ ${sectionNumber}: ${category}</h6></div>`;
     questions.forEach((q, index) => {
       html += `<div class="mb-3 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label><div class="d-flex justify-content-between px-1 px-md-4">`;
-      [5, 4, 3, 2, 1].forEach(score => {
-        html += `<div class="form-check text-center m-0 p-0"><input class="form-check-input float-none m-0" type="radio" name="${q.q_id}" value="${score}" required><label class="d-block small mt-1 text-muted">${score}</label></div>`;
-      });
+      [5, 4, 3, 2, 1].forEach(score => { html += `<div class="form-check text-center m-0 p-0"><input class="form-check-input float-none m-0" type="radio" name="${q.q_id}" value="${score}" required><label class="d-block small mt-1 text-muted">${score}</label></div>`; });
       html += `</div></div>`;
-    });
-    sectionNumber++;
-  }
-  html += '</form>';
+    }); sectionNumber++;
+  } html += '</form>';
 
   Swal.fire({
-    title: 'แบบประเมินความพึงพอใจโครงการ',
-    html: html,
-    width: '800px',
-    showCancelButton: true,
-    confirmButtonText: 'ส่งแบบประเมิน',
-    customClass: { popup: 'rounded-4 bg-light' },
+    title: 'แบบประเมินความพึงพอใจ', html: html, width: '800px', showCancelButton: true, confirmButtonText: 'ส่งแบบประเมิน', customClass: { popup: 'rounded-4 bg-light' },
     preConfirm: () => {
       const form = document.getElementById('satisfactionForm');
-      if (!form.checkValidity()) {
-        Swal.showValidationMessage('กรุณาตอบแบบประเมินให้ครบทุกข้อ');
-        return false;
-      }
+      if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบแบบประเมินให้ครบ'); return false; }
       return Object.fromEntries(new FormData(form).entries());
     }
-  }).then((result) => {
-    if (result.isConfirmed) Swal.fire('ขอบคุณครับ!', 'ระบบบันทึกผลการประเมินของคุณเรียบร้อยแล้ว', 'success');
-  });
+  }).then((result) => { if (result.isConfirmed) Swal.fire('ขอบคุณครับ!', 'บันทึกเรียบร้อย', 'success'); });
 }
 
-// ==========================================
-// 📌 6. ระบบของวิทยากรพี่เลี้ยง (Mentor Features)
-// ==========================================
+// ----------------------------------------
+// ระบบ Mentor
+// ----------------------------------------
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
-  tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูลกลุ่มของท่าน...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
 
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
   if (res.status === 'success') {
@@ -259,12 +210,7 @@ function renderMentorChart() {
     type: 'bar',
     data: {
       labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'],
-      datasets: [{
-        label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)',
-        data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout],
-        backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'],
-        borderRadius: 5
-      }]
+      datasets: [{ label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }]
     },
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
@@ -289,9 +235,8 @@ function filterMentorTable() {
 function renderMentorPaginatedTable() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '';
-
   if (filteredMentorData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบประวัติการลงเวลาในเงื่อนไขที่ค้นหา</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบประวัติการลงเวลา</td></tr>';
     document.getElementById('mentor-pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('mentor-pagination-controls').innerHTML = '';
     return;
@@ -308,13 +253,10 @@ function renderMentorPaginatedTable() {
   });
 
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(endIdx, filteredMentorData.length)} จาก ${filteredMentorData.length} รายการ`;
-
   const ul = document.getElementById('mentor-pagination-controls');
   ul.innerHTML = '';
   ul.innerHTML += `<li class="page-item ${mentorCurrentPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changeMentorPage(${mentorCurrentPage - 1}); return false;">ก่อนหน้า</a></li>`;
-  for (let i = 1; i <= totalPages; i++) {
-    ul.innerHTML += `<li class="page-item ${i === mentorCurrentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeMentorPage(${i}); return false;">${i}</a></li>`;
-  }
+  for (let i = 1; i <= totalPages; i++) { ul.innerHTML += `<li class="page-item ${i === mentorCurrentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeMentorPage(${i}); return false;">${i}</a></li>`; }
   ul.innerHTML += `<li class="page-item ${mentorCurrentPage === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="changeMentorPage(${mentorCurrentPage + 1}); return false;">ถัดไป</a></li>`;
 }
 
@@ -325,9 +267,9 @@ function changeMentorPage(page) {
   renderMentorPaginatedTable();
 }
 
-// ==========================================
-// 📌 7. ระบบของ Admin / Staff (Dashboard สถิติ)
-// ==========================================
+// ----------------------------------------
+// Dashboard Admin/Staff
+// ----------------------------------------
 async function fetchPieChartData() {
   const res = await callAPI('getAttendanceSummary');
   if (res.status === 'success') {
@@ -350,15 +292,14 @@ function startRealtimeDashboard() {
 
 async function fetchMissingData() {
   const tbody = document.getElementById('missing-table-body');
-  tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4"><div class="spinner-border spinner-border-sm text-danger"></div> โหลดข้อมูลคนขาด...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4"><div class="spinner-border spinner-border-sm text-danger"></div> โหลด...</td></tr>';
   const res = await callAPI('getMissingPersons', { dayNo: document.getElementById('missing-day').value, timeSlot: document.getElementById('missing-time').value });
   if (res.status === 'success') {
-    tbody.innerHTML = res.data.length === 0 ? '<tr><td colspan="3" class="text-center text-success py-3"><i class="bi bi-check-circle-fill"></i> มาครบทุกคน!</td></tr>' : '';
+    tbody.innerHTML = res.data.length === 0 ? '<tr><td colspan="3" class="text-center text-success py-3">มาครบทุกคน!</td></tr>' : '';
     res.data.forEach(p => tbody.innerHTML += `<tr><td class="ps-3"><span class="badge bg-light text-dark border">${p.personal_id}</span></td><td>${p.name}</td><td>${p.group}</td></tr>`);
   }
 }
 
-// [ตารางความก้าวหน้า Pagination & Filter]
 async function fetchProgressData() {
   const res = await callAPI('getTraineeProgress');
   if (res.status === 'success') { globalProgressData = res.data; filterProgressTable(); }
@@ -380,12 +321,11 @@ function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">ไม่พบข้อมูลผู้เข้าอบรม</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
   }
-
   const totalPages = Math.ceil(filteredProgressData.length / rowsPerPage);
   const startIdx = (currentPage - 1) * rowsPerPage;
   const endIdx = startIdx + rowsPerPage;
@@ -411,14 +351,14 @@ function changePage(page) {
   renderPaginatedTable();
 }
 
-// ==========================================
-// 📌 8. ระบบจัดการข้อมูล นำเข้า/ส่งออก (CRUD สำหรับ Admin)
-// ==========================================
+// ----------------------------------------
+// จัดการข้อมูล CRUD และ Config (Admin)
+// ----------------------------------------
 function handleImportCSV() {
   const file = document.getElementById('csvFileInput').files[0];
-  if (!file) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกไฟล์ .csv', 'warning');
+  if (!file) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกไฟล์', 'warning');
   const reader = new FileReader();
-  Swal.fire({ title: 'กำลังนำเข้าข้อมูลลงฐานข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  Swal.fire({ title: 'กำลังประมวลผล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   reader.onload = async e => {
     const res = await callAPI('importCSV', { csvText: e.target.result });
     if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); document.getElementById('csvFileInput').value = ''; }
@@ -428,14 +368,61 @@ function handleImportCSV() {
 }
 
 async function handleExportCSV() {
-  Swal.fire({ title: 'กำลังรวบรวมข้อมูลเพื่อสร้างไฟล์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  Swal.fire({ title: 'กำลังดึงข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('exportCSV');
   if (res.status === 'success') {
     Swal.close();
-    // เพิ่ม \uFEFF บังคับให้ Excel เปิดไฟล์เป็น UTF-8 เพื่อป้องกันภาษาไทยเพี้ยน
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob(["\uFEFF" + res.csvData], { type: 'text/csv;charset=utf-8;' }));
     link.download = res.filename;
     link.click();
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
+}
+
+async function loadConfigToUI() {
+  const tbody = document.getElementById('config-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div> กำลังดึงข้อมูลการตั้งค่า...</td></tr>';
+  const res = await callAPI('getRawAttendanceConfig');
+
+  if (res.status === 'success') {
+    tbody.innerHTML = '';
+    res.data.forEach((row) => {
+      const isChecked = row[7].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
+      tbody.innerHTML += `
+        <tr>
+          <td class="d-none"><input type="hidden" class="config-id" value="${row[0]}"></td>
+          <td class="d-none"><input type="hidden" class="config-slotid" value="${row[3]}"></td>
+          <td><span class="badge bg-secondary">${row[3]}</span></td>
+          <td><input type="number" class="form-control form-control-sm text-center mx-auto config-day" value="${row[1]}" style="width: 60px;"></td>
+          <td><input type="date" class="form-control form-control-sm config-date" value="${row[2]}"></td>
+          <td><input type="text" class="form-control form-control-sm config-label" value="${row[4]}"></td>
+          <td><input type="time" class="form-control form-control-sm config-start" value="${row[5]}"></td>
+          <td><input type="time" class="form-control form-control-sm config-end" value="${row[6]}"></td>
+          <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input config-active" type="checkbox" style="cursor:pointer;" ${isChecked}></div></td>
+        </tr>
+      `;
+    });
+  } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
+}
+
+async function saveConfigFromUI() {
+  Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  const rows = document.querySelectorAll('#config-table-body tr');
+  let newConfigData = [];
+  rows.forEach(tr => {
+    const id = tr.querySelector('.config-id').value;
+    const day = tr.querySelector('.config-day').value;
+    const date = tr.querySelector('.config-date').value;
+    const slotId = tr.querySelector('.config-slotid').value;
+    const label = tr.querySelector('.config-label').value;
+    const start = tr.querySelector('.config-start').value;
+    const end = tr.querySelector('.config-end').value;
+    const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
+    newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
+  });
+
+  const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
+  if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+  else Swal.fire('ข้อผิดพลาด', res.message, 'error');
 }
