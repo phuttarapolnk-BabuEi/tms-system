@@ -1,7 +1,7 @@
 // ==========================================
-// 📌 นำ URL จาก Google Apps Script (Web App URL) มาวางในเครื่องหมายคำพูดด้านล่างนี้
+// 📌 นำ URL จาก Google Apps Script มาวางในเครื่องหมายคำพูดด้านล่างนี้
 // ==========================================
-const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec"; 
 
 let currentUser = null;
 let globalProgressData = [];
@@ -24,22 +24,27 @@ async function callAPI(action, payload = {}) {
       body: JSON.stringify({ action: action, payload: payload })
     });
     return await response.json();
-  } catch (error) { return { status: 'error', message: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้" }; }
+  } catch (error) { throw new Error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
 }
 
 async function handleLogin() {
   const personalId = document.getElementById('input-personal-id').value.trim();
   if (!personalId) return Swal.fire('แจ้งเตือน', 'กรุณากรอกรหัสประจำตัว', 'warning');
 
-  Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  const res = await callAPI('loginUser', { personalId: personalId });
+  try {
+    Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    const res = await callAPI('loginUser', { personalId: personalId });
 
-  if (res.status === 'success') {
-    currentUser = res.user;
-    Swal.close();
-    setupDashboard();
-  } else {
-    Swal.fire('ข้อผิดพลาด', res.message, 'error');
+    if (res.status === 'success') {
+      currentUser = res.user;
+      Swal.close();
+      setupDashboard();
+    } else {
+      Swal.fire('ข้อผิดพลาด', res.message, 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    Swal.fire('ข้อผิดพลาดของระบบ', 'การเชื่อมต่อขัดข้อง หรือไม่ได้อัปเดต Code.gs', 'error');
   }
 }
 
@@ -100,42 +105,38 @@ async function loadAttendanceUI() {
   
   container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> <span class="small text-muted">กำลังซิงค์เวลาเซิร์ฟเวอร์...</span></div>';
 
-  const res = await callAPI('getAttendanceConfig');
-  
-  if (res.status === 'success') {
-    container.innerHTML = ''; 
-    const { schedule, serverDate, serverTime } = res;
+  try {
+    const res = await callAPI('getAttendanceConfig');
+    if (res.status === 'success') {
+      container.innerHTML = ''; 
+      const { schedule, serverDate, serverTime } = res;
 
-    if(schedule.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>';
-      return;
-    }
+      if(schedule.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>';
+        return;
+      }
 
-    schedule.forEach(day => {
-      let html = `<div class="mb-3 border-bottom pb-2">
-                    <h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${day.date})</span></h6>
-                    <div class="d-flex flex-wrap gap-2">`;
+      schedule.forEach(day => {
+        let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${day.date})</span></h6><div class="d-flex flex-wrap gap-2">`;
+        day.slots.forEach(slot => {
+          const isToday = (day.date === serverDate);
+          const isTimeValid = (serverTime >= slot.start && serverTime <= slot.end);
+          const isActive = isToday && isTimeValid;
 
-      day.slots.forEach(slot => {
-        const isToday = (day.date === serverDate);
-        const isTimeValid = (serverTime >= slot.start && serverTime <= slot.end);
-        const isActive = isToday && isTimeValid;
-
-        if (isActive) {
-          html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')">
-                     <i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small>
-                   </button>`;
-        } else {
-          html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled>
-                     <i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small>
-                   </button>`;
-        }
+          if (isActive) {
+            html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          } else {
+            html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          }
+        });
+        html += `</div></div>`;
+        container.innerHTML += html;
       });
-      html += `</div></div>`;
-      container.innerHTML += html;
-    });
-  } else {
-    container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ</div>`;
+    } else {
+      container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ</div>`;
+    }
+  } catch (e) {
+    container.innerHTML = `<div class="text-danger small">ขัดข้องทางเทคนิค</div>`;
   }
 }
 
@@ -317,14 +318,12 @@ function filterProgressTable() {
   renderPaginatedTable();
 }
 
-// 📌 อัปเดต: ฟังก์ชันวาดตารางแบบ Matrix (มีเครื่องหมายถูก/ขีดกลาง)
-// 📌 อัปเดต: ฟังก์ชันวาดตารางแบบ Matrix พร้อมระบบคำนวณเปอร์เซ็นต์
+// 📌 ฟังก์ชันวาดตารางแบบ Matrix (7 ช่อง)
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    // เปลี่ยน colspan เป็น 13 เพื่อให้คลุมครบทุกคอลัมน์ใหม่
     tbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
@@ -336,21 +335,18 @@ function renderPaginatedTable() {
   const endIdx = startIdx + rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, endIdx);
 
-  // ไอคอนสถานะ
   const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>';
   const crossMark = '<span class="text-muted opacity-25">-</span>';
 
   paginatedItems.forEach(p => { 
     const att = p.attendance || {};
-    let count = 0; // ตัวแปรนับจำนวนครั้งที่มา
-
-    // ฟังก์ชันช่วยเช็กและนับเวลา
+    let count = 0; 
+    
     const checkSlot = (day, time) => {
       if (att[day] && att[day][time]) { count++; return checkMark; }
       return crossMark;
     };
     
-    // เช็กสถานะ 7 ช่องหลัก
     const d1m = checkSlot('1', 'Morning');
     const d1a = checkSlot('1', 'Afternoon');
     const d1e = checkSlot('1', 'Evening');
@@ -361,16 +357,13 @@ function renderPaginatedTable() {
     
     const d3m = checkSlot('3', 'Morning');
 
-    // คำนวณเปอร์เซ็นต์ (ฐาน 7 ครั้ง)
     const totalSlots = 7;
     const percentage = Math.round((count / totalSlots) * 100);
     
-    // เปลี่ยนสีป้ายเปอร์เซ็นต์ตามเกณฑ์ (เขียว >= 80%, เหลือง >= 50%, แดง < 50%)
     let badgeColor = 'bg-danger';
     if (percentage >= 80) badgeColor = 'bg-success';
     else if (percentage >= 50) badgeColor = 'bg-warning text-dark';
 
-    // โครงสร้างจำลองสำหรับช่องประเมิน (รอเชื่อม Data ในอนาคต)
     const evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     const evalProject = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
