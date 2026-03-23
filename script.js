@@ -95,47 +95,30 @@ function setupDashboard() {
 }
 
 // ==========================================
-// 2. Trainee View (ระบบลงเวลาผู้เข้าอบรม)
+// 2. Trainee View (ระบบลงเวลา + ระบบทำข้อสอบ)
 // ==========================================
 async function loadAttendanceUI() {
   const container = document.getElementById('attendance-buttons-container');
   if(!container) return;
-  
   container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> <span class="small text-muted">กำลังซิงค์เวลาเซิร์ฟเวอร์...</span></div>';
-
   try {
     const res = await callAPI('getAttendanceConfig');
     if (res.status === 'success') {
       container.innerHTML = ''; 
       const { schedule, serverDate, serverTime } = res;
-
-      if(schedule.length === 0) {
-        container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>';
-        return;
-      }
-
+      if(schedule.length === 0) { container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>'; return; }
       schedule.forEach(day => {
         let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${day.date})</span></h6><div class="d-flex flex-wrap gap-2">`;
         day.slots.forEach(slot => {
-          const isToday = (day.date === serverDate);
-          const isTimeValid = (serverTime >= slot.start && serverTime <= slot.end);
-          const isActive = isToday && isTimeValid;
-
-          if (isActive) {
-            html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
-          } else {
-            html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
-          }
+          const isActive = (day.date === serverDate) && (serverTime >= slot.start && serverTime <= slot.end);
+          if (isActive) html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          else html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
         });
         html += `</div></div>`;
         container.innerHTML += html;
       });
-    } else {
-      container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ</div>`;
-    }
-  } catch (e) {
-    container.innerHTML = `<div class="text-danger small">ขัดข้องทางเทคนิค</div>`;
-  }
+    } else { container.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> โหลดตารางเวลาไม่สำเร็จ</div>`; }
+  } catch (e) { container.innerHTML = `<div class="text-danger small">ขัดข้องทางเทคนิค</div>`; }
 }
 
 async function checkInModal(dayNo, timeSlot) {
@@ -143,15 +126,64 @@ async function checkInModal(dayNo, timeSlot) {
   if (note !== undefined) {
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const res = await callAPI('recordAttendance', { personalId: currentUser.personal_id, dayNo: dayNo, timeSlot: timeSlot, note: note });
-    if (res.status === 'success') {
-      Swal.fire('สำเร็จ', res.message, 'success');
-      loadAttendanceUI();
-    } else {
-      Swal.fire('แจ้งเตือน', res.message, 'warning');
-    }
+    if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); loadAttendanceUI(); } 
+    else { Swal.fire('แจ้งเตือน', res.message, 'warning'); }
   }
 }
 
+// 📌 ฟังก์ชันใหม่: เรียกหน้าต่างทำข้อสอบ
+async function openExamModal(testType) {
+  Swal.fire({ title: 'กำลังโหลดข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  const res = await callAPI('getQuestions', { qType: 'TEST' });
+  if (res.status === 'success') {
+    Swal.close();
+    renderExamUI(res.data, testType);
+  } else {
+    Swal.fire('ข้อผิดพลาด', res.message, 'error');
+  }
+}
+
+// 📌 ฟังก์ชันใหม่: วาดหน้ากระดาษข้อสอบ
+function renderExamUI(examData, testType) {
+  if (examData.length === 0) return Swal.fire('แจ้งเตือน', 'ยังไม่มีข้อสอบในระบบ', 'warning');
+
+  let html = `<form id="examForm" class="text-start" style="font-size: 0.95rem;">`;
+  const title = testType === 'PRE' ? '📝 แบบทดสอบก่อนเรียน (Pre-Test)' : '✅ แบบทดสอบหลังเรียน (Post-Test)';
+
+  examData.forEach((q, index) => {
+    html += `<div class="mb-4 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label>`;
+    const letters = ['A', 'B', 'C', 'D', 'E']; // รองรับตัวเลือก ก ข ค ง จ (ที่ระบบแปลงเป็น A B C D)
+    q.options.forEach((opt, optIdx) => {
+      if (opt) {
+        html += `<div class="form-check mb-2">
+                   <input class="form-check-input" type="radio" name="${q.q_id}" id="${q.q_id}_${letters[optIdx]}" value="${letters[optIdx]}" required>
+                   <label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${letters[optIdx]}">${letters[optIdx]}. ${opt}</label>
+                 </div>`;
+      }
+    });
+    html += `</div>`;
+  });
+  html += '</form>';
+
+  Swal.fire({
+    title: title, html: html, width: '800px', showCancelButton: true, confirmButtonText: 'ส่งคำตอบ', cancelButtonText: 'ยกเลิก', customClass: { popup: 'rounded-4 bg-light' },
+    preConfirm: () => {
+      const form = document.getElementById('examForm');
+      if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบข้อสอบให้ครบทุกข้อ'); return false; }
+      return Object.fromEntries(new FormData(form).entries());
+    }
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      Swal.fire({ title: 'กำลังตรวจคำตอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+      const res = await callAPI('submitTestScore', { personalId: currentUser.personal_id, testType: testType, answers: result.value });
+      if (res.status === 'success') {
+        Swal.fire({ icon: 'success', title: 'ส่งคำตอบสำเร็จ!', text: res.message, confirmButtonText: 'ยอดเยี่ยม' });
+      } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
+    }
+  });
+}
+
+// แบบประเมิน (Survey)
 async function openSurveyModal() {
   Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: 'SURVEY' });
@@ -187,30 +219,19 @@ function renderSurveyUI(surveyData) {
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
-  
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
-  if (res.status === 'success') {
-    globalMentorData = res.data;
-    renderMentorChart();
-    filterMentorTable();
-  } else {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด: ${res.message}</td></tr>`;
-  }
+  if (res.status === 'success') { globalMentorData = res.data; renderMentorChart(); filterMentorTable(); } 
+  else { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด: ${res.message}</td></tr>`; }
 }
 
 function renderMentorChart() {
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
   globalMentorData.forEach(log => { if(counts[log.time_slot] !== undefined) counts[log.time_slot]++; });
-
   const ctx = document.getElementById('mentorBarChart');
   if (mentorChartInstance) mentorChartInstance.destroy();
-  
   mentorChartInstance = new Chart(ctx, {
     type: 'bar',
-    data: { 
-      labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'], 
-      datasets: [{ label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }] 
-    },
+    data: { labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'], datasets: [{ label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }] },
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
 }
@@ -219,14 +240,12 @@ function filterMentorTable() {
   const keyword = document.getElementById('mentor-search').value.toLowerCase();
   const filterDay = document.getElementById('mentor-filter-day').value;
   const filterTime = document.getElementById('mentor-filter-time').value;
-
   filteredMentorData = globalMentorData.filter(log => {
     const matchKey = log.name.toLowerCase().includes(keyword) || log.personal_id.toString().includes(keyword);
     const matchDay = filterDay === 'ALL' || log.day_no.toString() === filterDay;
     const matchTime = filterTime === 'ALL' || log.time_slot === filterTime;
     return matchKey && matchDay && matchTime;
   });
-
   mentorCurrentPage = 1; 
   renderMentorPaginatedTable();
 }
@@ -240,17 +259,13 @@ function renderMentorPaginatedTable() {
     document.getElementById('mentor-pagination-controls').innerHTML = '';
     return;
   }
-
   const totalPages = Math.ceil(filteredMentorData.length / rowsPerPage);
   const startIdx = (mentorCurrentPage - 1) * rowsPerPage;
   const endIdx = startIdx + rowsPerPage;
   const paginatedItems = filteredMentorData.slice(startIdx, endIdx);
   const timeTranslates = { 'Morning': 'เช้า', 'Afternoon': 'บ่าย', 'Evening': 'เย็น', 'Checkout': 'สะท้อนผล' };
 
-  paginatedItems.forEach(log => {
-    tbody.innerHTML += `<tr><td class="ps-3"><code>${log.personal_id}</code></td><td>${log.name}</td><td>วันที่ ${log.day_no}</td><td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span></td><td class="small text-muted">${log.timestamp}</td></tr>`;
-  });
-
+  paginatedItems.forEach(log => { tbody.innerHTML += `<tr><td class="ps-3"><code>${log.personal_id}</code></td><td>${log.name}</td><td>วันที่ ${log.day_no}</td><td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span></td><td class="small text-muted">${log.timestamp}</td></tr>`; });
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(endIdx, filteredMentorData.length)} จาก ${filteredMentorData.length} รายการ`;
   const ul = document.getElementById('mentor-pagination-controls');
   ul.innerHTML = '';
@@ -272,15 +287,12 @@ function changeMentorPage(page) {
 function startRealtimeDashboard() {
   fetchProgressData();
   if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-  chartUpdateInterval = setInterval(fetchProgressData, 30000); // อัปเดตตารางทุก 30 วินาที
+  chartUpdateInterval = setInterval(fetchProgressData, 30000); 
 }
 
 async function fetchProgressData() {
   const res = await callAPI('getTraineeProgress');
-  if (res.status === 'success') { 
-    globalProgressData = res.data; 
-    filterProgressTable(); 
-  }
+  if (res.status === 'success') { globalProgressData = res.data; filterProgressTable(); }
 }
 
 function filterProgressTable() {
@@ -295,13 +307,12 @@ function filterProgressTable() {
   renderPaginatedTable();
 }
 
-// 📌 ฟังก์ชันวาดตาราง Matrix แบบ 16 คอลัมน์ (รวมคะแนนและประเมิน)
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
@@ -317,16 +328,14 @@ function renderPaginatedTable() {
 
   paginatedItems.forEach(p => { 
     const att = p.attendance || {};
-    const test = p.testScore || {}; // ดึง Object คะแนนสอบ (ถ้ามี)
+    const test = p.testScore || {}; 
     let count = 0; 
     
-    // ฟังก์ชันเช็กเวลา
     const checkSlot = (day, time) => {
       if (att[day] && att[day][time]) { count++; return checkMark; }
       return crossMark;
     };
     
-    // วันที่ 1-3 รวม 7 ช่วงเวลา
     const d1m = checkSlot('1', 'Morning');
     const d1a = checkSlot('1', 'Afternoon');
     const d1e = checkSlot('1', 'Evening');
@@ -335,7 +344,6 @@ function renderPaginatedTable() {
     const d2e = checkSlot('2', 'Evening');
     const d3m = checkSlot('3', 'Morning');
 
-    // คำนวณร้อยละ
     const totalSlots = 7;
     const percentage = Math.round((count / totalSlots) * 100);
     
@@ -343,11 +351,9 @@ function renderPaginatedTable() {
     if (percentage >= 80) badgeColor = 'bg-success';
     else if (percentage >= 50) badgeColor = 'bg-warning text-dark';
 
-    // จัดการข้อมูล Pre-Test / Post-Test
     const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
     const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
 
-    // จัดการข้อมูลการประเมิน (รอระบบสมบูรณ์)
     const evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     const evalProject = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
@@ -361,7 +367,6 @@ function renderPaginatedTable() {
         <td class="border-end">${d3m}</td>
         <td class="fw-bold bg-light border-start">${count}</td>
         <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
-        
         <td>${preScore}</td>
         <td>${evalSpeaker}</td>
         <td>${postScore}</td>
