@@ -9,7 +9,7 @@ let filteredProgressData = [];
 let pieChartInstance = null;
 let chartUpdateInterval = null;
 let currentPage = 1;
-const rowsPerPage = 10;
+const rowsPerPage = 10; 
 
 let globalMentorData = [];
 let filteredMentorData = [];
@@ -49,13 +49,13 @@ async function handleLogin() {
 function setupDashboard() {
   document.getElementById('login-view').classList.remove('d-block');
   document.getElementById('main-nav').style.display = 'block';
-
+  
   const safeRole = currentUser.role ? currentUser.role.toString().trim().toUpperCase() : 'TRAINEE';
   document.getElementById('display-user-name').innerText = currentUser.name;
   document.getElementById('display-user-role').innerText = safeRole;
 
   document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
-
+  
   if (safeRole === 'ADMIN' || safeRole === 'STAFF') {
     document.getElementById('admin-view').classList.add('d-block');
     startRealtimeDashboard();
@@ -63,13 +63,13 @@ function setupDashboard() {
 
     const crudMenu = document.getElementById('nav-crud-menu');
     const statsTabBtn = document.querySelector('a[href="#stats"]');
-
+    
     if (safeRole === 'STAFF') {
-      crudMenu.classList.add('d-none');
+      crudMenu.classList.add('d-none'); 
       if (statsTabBtn) statsTabBtn.click();
     } else {
-      crudMenu.classList.remove('d-none');
-      loadConfigToUI(); // โหลดตารางตั้งค่าเวลาสำหรับ ADMIN
+      crudMenu.classList.remove('d-none'); 
+      loadConfigToUI(); 
     }
 
   } else if (safeRole === 'MENTOR') {
@@ -78,7 +78,7 @@ function setupDashboard() {
 
   } else {
     document.getElementById('trainee-view').classList.add('d-block');
-    loadAttendanceUI(); // โหลดปุ่มลงเวลาให้ TRAINEE
+    loadAttendanceUI(); 
   }
 }
 
@@ -96,17 +96,17 @@ function logout() {
 // ----------------------------------------
 async function loadAttendanceUI() {
   const container = document.getElementById('attendance-buttons-container');
-  if (!container) return;
-
+  if(!container) return;
+  
   container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> <span class="small text-muted">กำลังซิงค์เวลาเซิร์ฟเวอร์...</span></div>';
 
   const res = await callAPI('getAttendanceConfig');
-
+  
   if (res.status === 'success') {
-    container.innerHTML = '';
+    container.innerHTML = ''; 
     const { schedule, serverDate, serverTime } = res;
 
-    if (schedule.length === 0) {
+    if(schedule.length === 0) {
       container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>';
       return;
     }
@@ -188,7 +188,7 @@ function renderSurveyUI(surveyData) {
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
-
+  
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
   if (res.status === 'success') {
     globalMentorData = res.data;
@@ -201,16 +201,16 @@ async function fetchMentorData() {
 
 function renderMentorChart() {
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
-  globalMentorData.forEach(log => { if (counts[log.time_slot] !== undefined) counts[log.time_slot]++; });
+  globalMentorData.forEach(log => { if(counts[log.time_slot] !== undefined) counts[log.time_slot]++; });
 
   const ctx = document.getElementById('mentorBarChart');
   if (mentorChartInstance) mentorChartInstance.destroy();
-
+  
   mentorChartInstance = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'],
-      datasets: [{ label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }]
+    data: { 
+      labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'], 
+      datasets: [{ label: 'ยอดการลงเวลาของกลุ่ม (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }] 
     },
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
@@ -228,7 +228,7 @@ function filterMentorTable() {
     return matchKey && matchDay && matchTime;
   });
 
-  mentorCurrentPage = 1;
+  mentorCurrentPage = 1; 
   renderMentorPaginatedTable();
 }
 
@@ -280,14 +280,14 @@ async function fetchPieChartData() {
       data: { labels: res.labels, datasets: [{ data: res.values, backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderWidth: 0 }] },
       options: { responsive: true, maintainAspectRatio: false, cutout: '65%' }
     });
-    fetchMissingData();
+    fetchMissingData(); 
   }
 }
 
 function startRealtimeDashboard() {
   fetchPieChartData();
   if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-  chartUpdateInterval = setInterval(fetchPieChartData, 30000);
+  chartUpdateInterval = setInterval(fetchPieChartData, 30000); 
 }
 
 async function fetchMissingData() {
@@ -313,7 +313,7 @@ function filterProgressTable() {
     const matchGroup = selectedGroup === 'ALL' || p.group.toString() === selectedGroup;
     return matchKeyword && matchGroup;
   });
-  currentPage = 1;
+  currentPage = 1; 
   renderPaginatedTable();
 }
 
@@ -361,7 +361,7 @@ function handleImportCSV() {
   Swal.fire({ title: 'กำลังประมวลผล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   reader.onload = async e => {
     const res = await callAPI('importCSV', { csvText: e.target.result });
-    if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); document.getElementById('csvFileInput').value = ''; }
+    if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); document.getElementById('csvFileInput').value = ''; } 
     else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
   };
   reader.readAsText(file, 'UTF-8');
@@ -379,13 +379,12 @@ async function handleExportCSV() {
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
-// 📌 [อัปเดต] โหลดตารางพร้อมแปลงช่องรหัสรอบให้เป็น Dropdown
 async function loadConfigToUI() {
   const tbody = document.getElementById('config-table-body');
-  if (!tbody) return;
+  if(!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border spinner-border-sm text-warning"></div> กำลังดึงข้อมูลการตั้งค่า...</td></tr>';
   const res = await callAPI('getRawAttendanceConfig');
-
+  
   if (res.status === 'success') {
     tbody.innerHTML = '';
     res.data.forEach((row) => {
@@ -414,10 +413,9 @@ async function loadConfigToUI() {
   } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">โหลดข้อมูลล้มเหลว</td></tr>`; }
 }
 
-// 📌 [อัปเดต] กดเพิ่มแถว จะสร้างแถวใหม่ที่เป็น Dropdown 
 function addConfigRow() {
   const tbody = document.getElementById('config-table-body');
-  if (!tbody) return;
+  if(!tbody) return;
   const newId = 'CONF-NEW-' + Math.floor(Math.random() * 10000);
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -451,25 +449,24 @@ async function saveConfigFromUI() {
     Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const rows = document.querySelectorAll('#config-table-body tr');
     let newConfigData = [];
-
-    for (let tr of rows) {
-      if (!tr.querySelector('.config-id')) continue;
+    
+    for(let tr of rows) {
+      if(!tr.querySelector('.config-id')) continue; 
       const id = tr.querySelector('.config-id').value;
       const day = tr.querySelector('.config-day').value;
       const date = tr.querySelector('.config-date').value;
-      // ตอนนี้ดึงค่า value ออกมาจาก Dropdown select โดยตรงได้เลย
-      const slotId = tr.querySelector('.config-slotid').value;
+      const slotId = tr.querySelector('.config-slotid').value; 
       const label = tr.querySelector('.config-label').value;
       const start = tr.querySelector('.config-start').value;
       const end = tr.querySelector('.config-end').value;
       const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
       newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
     }
-
+    
     const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
     if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
     else Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
-
+    
   } catch (error) {
     console.error("Save Error: ", error);
     Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error');
