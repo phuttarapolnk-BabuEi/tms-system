@@ -318,12 +318,14 @@ function filterProgressTable() {
 }
 
 // 📌 อัปเดต: ฟังก์ชันวาดตารางแบบ Matrix (มีเครื่องหมายถูก/ขีดกลาง)
+// 📌 อัปเดต: ฟังก์ชันวาดตารางแบบ Matrix พร้อมระบบคำนวณเปอร์เซ็นต์
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    // เปลี่ยน colspan เป็น 13 เพื่อให้คลุมครบทุกคอลัมน์ใหม่
+    tbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
@@ -339,20 +341,38 @@ function renderPaginatedTable() {
   const crossMark = '<span class="text-muted opacity-25">-</span>';
 
   paginatedItems.forEach(p => { 
-    // ดึงประวัติการลงเวลาของคนๆ นี้
     const att = p.attendance || {};
+    let count = 0; // ตัวแปรนับจำนวนครั้งที่มา
+
+    // ฟังก์ชันช่วยเช็กและนับเวลา
+    const checkSlot = (day, time) => {
+      if (att[day] && att[day][time]) { count++; return checkMark; }
+      return crossMark;
+    };
     
-    // เช็กสถานะแต่ละช่อง ถ้ามีค่า(true) ให้ใส่เครื่องหมายถูก ถ้าไม่มีให้ใส่ขีดกลาง
-    const d1m = (att['1'] && att['1']['Morning']) ? checkMark : crossMark;
-    const d1a = (att['1'] && att['1']['Afternoon']) ? checkMark : crossMark;
-    const d1e = (att['1'] && att['1']['Evening']) ? checkMark : crossMark;
+    // เช็กสถานะ 7 ช่องหลัก
+    const d1m = checkSlot('1', 'Morning');
+    const d1a = checkSlot('1', 'Afternoon');
+    const d1e = checkSlot('1', 'Evening');
     
-    const d2m = (att['2'] && att['2']['Morning']) ? checkMark : crossMark;
-    const d2a = (att['2'] && att['2']['Afternoon']) ? checkMark : crossMark;
-    const d2e = (att['2'] && att['2']['Evening']) ? checkMark : crossMark;
+    const d2m = checkSlot('2', 'Morning');
+    const d2a = checkSlot('2', 'Afternoon');
+    const d2e = checkSlot('2', 'Evening');
     
-    const d3m = (att['3'] && att['3']['Morning']) ? checkMark : crossMark;
-    const d3c = (att['3'] && att['3']['Checkout']) ? checkMark : crossMark;
+    const d3m = checkSlot('3', 'Morning');
+
+    // คำนวณเปอร์เซ็นต์ (ฐาน 7 ครั้ง)
+    const totalSlots = 7;
+    const percentage = Math.round((count / totalSlots) * 100);
+    
+    // เปลี่ยนสีป้ายเปอร์เซ็นต์ตามเกณฑ์ (เขียว >= 80%, เหลือง >= 50%, แดง < 50%)
+    let badgeColor = 'bg-danger';
+    if (percentage >= 80) badgeColor = 'bg-success';
+    else if (percentage >= 50) badgeColor = 'bg-warning text-dark';
+
+    // โครงสร้างจำลองสำหรับช่องประเมิน (รอเชื่อม Data ในอนาคต)
+    const evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
+    const evalProject = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
     tbody.innerHTML += `
       <tr>
@@ -361,7 +381,11 @@ function renderPaginatedTable() {
         <td><span class="badge bg-info text-dark">กลุ่ม ${p.group}</span></td>
         <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
         <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
-        <td>${d3m}</td><td>${d3c}</td>
+        <td class="border-end">${d3m}</td>
+        <td class="fw-bold bg-light border-start">${count}</td>
+        <td class="bg-light"><span class="badge ${badgeColor}">${percentage}%</span></td>
+        <td>${evalSpeaker}</td>
+        <td>${evalProject}</td>
       </tr>
     `; 
   });
