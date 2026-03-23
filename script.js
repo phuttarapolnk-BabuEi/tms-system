@@ -1,12 +1,12 @@
 // ==========================================
 // 📌 นำ URL จาก Google Apps Script มาวางในเครื่องหมายคำพูดด้านล่างนี้
 // ==========================================
-const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec"; 
+const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
 
 let currentUser = null;
 let globalProgressData = [];
 let filteredProgressData = [];
-let chartUpdateInterval = null; // เปลี่ยนมาใช้กับการอัปเดตตารางแทน
+let chartUpdateInterval = null; 
 let currentPage = 1;
 const rowsPerPage = 10; 
 
@@ -15,6 +15,9 @@ let filteredMentorData = [];
 let mentorChartInstance = null;
 let mentorCurrentPage = 1;
 
+// ==========================================
+// 1. Core API & Authentication
+// ==========================================
 async function callAPI(action, payload = {}) {
   try {
     const response = await fetch(API_URL, {
@@ -43,13 +46,19 @@ async function handleLogin() {
     }
   } catch (err) {
     console.error(err);
-    Swal.fire('ข้อผิดพลาดของระบบ', 'การเชื่อมต่อขัดข้อง', 'error');
+    Swal.fire('ข้อผิดพลาดของระบบ', 'การเชื่อมต่อขัดข้อง หรือไม่ได้อัปเดต Code.gs', 'error');
   }
 }
 
-// ----------------------------------------
-// ระบบ Routing หน้าจอตาม Role
-// ----------------------------------------
+function logout() {
+  currentUser = null;
+  if (chartUpdateInterval) clearInterval(chartUpdateInterval);
+  document.getElementById('main-nav').style.display = 'none';
+  document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
+  document.getElementById('login-view').classList.add('d-block');
+  document.getElementById('input-personal-id').value = '';
+}
+
 function setupDashboard() {
   document.getElementById('login-view').classList.remove('d-block');
   document.getElementById('main-nav').style.display = 'block';
@@ -85,18 +94,9 @@ function setupDashboard() {
   }
 }
 
-function logout() {
-  currentUser = null;
-  if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-  document.getElementById('main-nav').style.display = 'none';
-  document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
-  document.getElementById('login-view').classList.add('d-block');
-  document.getElementById('input-personal-id').value = '';
-}
-
-// ----------------------------------------
-// ระบบ Trainee (ลงเวลาอัตโนมัติ)
-// ----------------------------------------
+// ==========================================
+// 2. Trainee View (ระบบลงเวลาผู้เข้าอบรม)
+// ==========================================
 async function loadAttendanceUI() {
   const container = document.getElementById('attendance-buttons-container');
   if(!container) return;
@@ -181,9 +181,9 @@ function renderSurveyUI(surveyData) {
   }).then((result) => { if (result.isConfirmed) Swal.fire('ขอบคุณครับ!', 'บันทึกเรียบร้อย', 'success'); });
 }
 
-// ----------------------------------------
-// ระบบ Mentor
-// ----------------------------------------
+// ==========================================
+// 3. Mentor View (ระบบวิทยากรพี่เลี้ยง)
+// ==========================================
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
@@ -266,18 +266,21 @@ function changeMentorPage(page) {
   renderMentorPaginatedTable();
 }
 
-// ----------------------------------------
-// Dashboard Admin/Staff (ตาราง Matrix เท่านั้น)
-// ----------------------------------------
+// ==========================================
+// 4. Admin Dashboard (ตารางสรุปภาระงาน Matrix)
+// ==========================================
 function startRealtimeDashboard() {
   fetchProgressData();
   if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-  chartUpdateInterval = setInterval(fetchProgressData, 30000); // Auto-refresh ตารางทุก 30 วิ
+  chartUpdateInterval = setInterval(fetchProgressData, 30000); // อัปเดตตารางทุก 30 วินาที
 }
 
 async function fetchProgressData() {
   const res = await callAPI('getTraineeProgress');
-  if (res.status === 'success') { globalProgressData = res.data; filterProgressTable(); }
+  if (res.status === 'success') { 
+    globalProgressData = res.data; 
+    filterProgressTable(); 
+  }
 }
 
 function filterProgressTable() {
@@ -292,13 +295,13 @@ function filterProgressTable() {
   renderPaginatedTable();
 }
 
-// 📌 ฟังก์ชันวาดตารางแบบ Matrix
+// 📌 ฟังก์ชันวาดตาราง Matrix แบบ 16 คอลัมน์ (รวมคะแนนและประเมิน)
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
@@ -314,23 +317,25 @@ function renderPaginatedTable() {
 
   paginatedItems.forEach(p => { 
     const att = p.attendance || {};
+    const test = p.testScore || {}; // ดึง Object คะแนนสอบ (ถ้ามี)
     let count = 0; 
     
+    // ฟังก์ชันเช็กเวลา
     const checkSlot = (day, time) => {
       if (att[day] && att[day][time]) { count++; return checkMark; }
       return crossMark;
     };
     
+    // วันที่ 1-3 รวม 7 ช่วงเวลา
     const d1m = checkSlot('1', 'Morning');
     const d1a = checkSlot('1', 'Afternoon');
     const d1e = checkSlot('1', 'Evening');
-    
     const d2m = checkSlot('2', 'Morning');
     const d2a = checkSlot('2', 'Afternoon');
     const d2e = checkSlot('2', 'Evening');
-    
     const d3m = checkSlot('3', 'Morning');
 
+    // คำนวณร้อยละ
     const totalSlots = 7;
     const percentage = Math.round((count / totalSlots) * 100);
     
@@ -338,6 +343,11 @@ function renderPaginatedTable() {
     if (percentage >= 80) badgeColor = 'bg-success';
     else if (percentage >= 50) badgeColor = 'bg-warning text-dark';
 
+    // จัดการข้อมูล Pre-Test / Post-Test
+    const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
+    const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
+
+    // จัดการข้อมูลการประเมิน (รอระบบสมบูรณ์)
     const evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     const evalProject = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
@@ -345,13 +355,16 @@ function renderPaginatedTable() {
       <tr>
         <td><code>${p.id}</code></td>
         <td class="text-start">${p.name}</td>
-        <td><span class="badge bg-info text-dark">กลุ่ม ${p.group}</span></td>
+        <td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
         <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
         <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
         <td class="border-end">${d3m}</td>
         <td class="fw-bold bg-light border-start">${count}</td>
-        <td class="bg-light"><span class="badge ${badgeColor}">${percentage}%</span></td>
+        <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
+        
+        <td>${preScore}</td>
         <td>${evalSpeaker}</td>
+        <td>${postScore}</td>
         <td>${evalProject}</td>
       </tr>
     `; 
@@ -376,9 +389,9 @@ function changePage(page) {
   renderPaginatedTable();
 }
 
-// ----------------------------------------
-// จัดการข้อมูล CRUD และ Config (Admin)
-// ----------------------------------------
+// ==========================================
+// 5. Admin Config (ตั้งค่าระบบ & จัดการ CSV)
+// ==========================================
 function handleImportCSV() {
   const file = document.getElementById('csvFileInput').files[0];
   if (!file) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกไฟล์', 'warning');
