@@ -137,9 +137,18 @@
                     <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 pt-3">
                       <span class="fw-bold text-danger"><i class="bi bi-person-x-fill"></i> ผู้ที่ยังไม่มาลงเวลา</span>
                       
-                      <div class="d-flex gap-2">
-                        <select id="missing-day" class="form-select form-select-sm rounded-pill w-auto" onchange="fetchMissingData()"><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option></select>
-                        <select id="missing-time" class="form-select form-select-sm rounded-pill w-auto" onchange="fetchMissingData()"><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option></select>
+                      <div class="d-flex gap-2 justify-content-end">
+                        <select id="missing-day" class="form-select form-select-sm rounded-pill w-auto" onchange="fetchMissingData()">
+                          <option value="1">วันที่ 1</option>
+                          <option value="2">วันที่ 2</option>
+                          <option value="3">วันที่ 3</option>
+                        </select>
+                        <select id="missing-time" class="form-select form-select-sm rounded-pill w-auto" onchange="fetchMissingData()">
+                          <option value="Morning">เช้า</option>
+                          <option value="Afternoon">บ่าย</option>
+                          <option value="Evening">เย็น</option>
+                          <option value="Checkout">สะท้อนผล</option>
+                        </select>
                       </div>
 
                     </div>
