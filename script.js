@@ -317,21 +317,55 @@ function filterProgressTable() {
   renderPaginatedTable();
 }
 
+// 📌 อัปเดต: ฟังก์ชันวาดตารางแบบ Matrix (มีเครื่องหมายถูก/ขีดกลาง)
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
+  
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
   }
+  
   const totalPages = Math.ceil(filteredProgressData.length / rowsPerPage);
   const startIdx = (currentPage - 1) * rowsPerPage;
   const endIdx = startIdx + rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, endIdx);
 
-  paginatedItems.forEach(p => { tbody.innerHTML += `<tr><td class="ps-3"><code>${p.id}</code></td><td>${p.name}</td><td><span class="badge bg-info text-dark">กลุ่ม ${p.group}</span></td></tr>`; });
+  // ไอคอนสถานะ
+  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>';
+  const crossMark = '<span class="text-muted opacity-25">-</span>';
+
+  paginatedItems.forEach(p => { 
+    // ดึงประวัติการลงเวลาของคนๆ นี้
+    const att = p.attendance || {};
+    
+    // เช็กสถานะแต่ละช่อง ถ้ามีค่า(true) ให้ใส่เครื่องหมายถูก ถ้าไม่มีให้ใส่ขีดกลาง
+    const d1m = (att['1'] && att['1']['Morning']) ? checkMark : crossMark;
+    const d1a = (att['1'] && att['1']['Afternoon']) ? checkMark : crossMark;
+    const d1e = (att['1'] && att['1']['Evening']) ? checkMark : crossMark;
+    
+    const d2m = (att['2'] && att['2']['Morning']) ? checkMark : crossMark;
+    const d2a = (att['2'] && att['2']['Afternoon']) ? checkMark : crossMark;
+    const d2e = (att['2'] && att['2']['Evening']) ? checkMark : crossMark;
+    
+    const d3m = (att['3'] && att['3']['Morning']) ? checkMark : crossMark;
+    const d3c = (att['3'] && att['3']['Checkout']) ? checkMark : crossMark;
+
+    tbody.innerHTML += `
+      <tr>
+        <td><code>${p.id}</code></td>
+        <td class="text-start">${p.name}</td>
+        <td><span class="badge bg-info text-dark">กลุ่ม ${p.group}</span></td>
+        <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
+        <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
+        <td>${d3m}</td><td>${d3c}</td>
+      </tr>
+    `; 
+  });
+  
   document.getElementById('pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(endIdx, filteredProgressData.length)} จากทั้งหมด ${filteredProgressData.length} รายการ`;
   renderPaginationControls(totalPages);
 }
