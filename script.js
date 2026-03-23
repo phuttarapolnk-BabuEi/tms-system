@@ -6,8 +6,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9E
 let currentUser = null;
 let globalProgressData = [];
 let filteredProgressData = [];
-let pieChartInstance = null;
-let chartUpdateInterval = null;
+let chartUpdateInterval = null; // เปลี่ยนมาใช้กับการอัปเดตตารางแทน
 let currentPage = 1;
 const rowsPerPage = 10; 
 
@@ -44,7 +43,7 @@ async function handleLogin() {
     }
   } catch (err) {
     console.error(err);
-    Swal.fire('ข้อผิดพลาดของระบบ', 'การเชื่อมต่อขัดข้อง หรือไม่ได้อัปเดต Code.gs', 'error');
+    Swal.fire('ข้อผิดพลาดของระบบ', 'การเชื่อมต่อขัดข้อง', 'error');
   }
 }
 
@@ -64,7 +63,6 @@ function setupDashboard() {
   if (safeRole === 'ADMIN' || safeRole === 'STAFF') {
     document.getElementById('admin-view').classList.add('d-block');
     startRealtimeDashboard();
-    fetchProgressData();
 
     const crudMenu = document.getElementById('nav-crud-menu');
     const statsTabBtn = document.querySelector('a[href="#stats"]');
@@ -269,36 +267,12 @@ function changeMentorPage(page) {
 }
 
 // ----------------------------------------
-// Dashboard Admin/Staff
+// Dashboard Admin/Staff (ตาราง Matrix เท่านั้น)
 // ----------------------------------------
-async function fetchPieChartData() {
-  const res = await callAPI('getAttendanceSummary');
-  if (res.status === 'success') {
-    const ctx = document.getElementById('attendancePieChart');
-    if (pieChartInstance) pieChartInstance.destroy();
-    pieChartInstance = new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels: res.labels, datasets: [{ data: res.values, backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderWidth: 0 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '65%' }
-    });
-    fetchMissingData(); 
-  }
-}
-
 function startRealtimeDashboard() {
-  fetchPieChartData();
+  fetchProgressData();
   if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-  chartUpdateInterval = setInterval(fetchPieChartData, 30000); 
-}
-
-async function fetchMissingData() {
-  const tbody = document.getElementById('missing-table-body');
-  tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4"><div class="spinner-border spinner-border-sm text-danger"></div> โหลด...</td></tr>';
-  const res = await callAPI('getMissingPersons', { dayNo: document.getElementById('missing-day').value, timeSlot: document.getElementById('missing-time').value });
-  if (res.status === 'success') {
-    tbody.innerHTML = res.data.length === 0 ? '<tr><td colspan="3" class="text-center text-success py-3">มาครบทุกคน!</td></tr>' : '';
-    res.data.forEach(p => tbody.innerHTML += `<tr><td class="ps-3"><span class="badge bg-light text-dark border">${p.personal_id}</span></td><td>${p.name}</td><td>${p.group}</td></tr>`);
-  }
+  chartUpdateInterval = setInterval(fetchProgressData, 30000); // Auto-refresh ตารางทุก 30 วิ
 }
 
 async function fetchProgressData() {
@@ -318,7 +292,7 @@ function filterProgressTable() {
   renderPaginatedTable();
 }
 
-// 📌 ฟังก์ชันวาดตารางแบบ Matrix (7 ช่อง)
+// 📌 ฟังก์ชันวาดตารางแบบ Matrix
 function renderPaginatedTable() {
   const tbody = document.getElementById('progress-table-body');
   tbody.innerHTML = '';
