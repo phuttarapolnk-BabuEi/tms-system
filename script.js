@@ -142,8 +142,24 @@ function shuffleArray(array) {
   return array;
 }
 
-// 📌 ฟังก์ชันใหม่: เรียกหน้าต่างทำข้อสอบ
+// 📌 ฟังก์ชันใหม่: เรียกหน้าต่างทำข้อสอบ (อัปเกรดมีระบบเช็กสิทธิ์และเวลา)
 async function openExamModal(testType) {
+  Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  
+  // 1. ส่งไปถามระบบหลังบ้านก่อนว่า มีสิทธิ์สอบไหม? และอยู่ในเวลาไหม?
+  const checkRes = await callAPI('checkExamEligibility', { personalId: currentUser.personal_id, testType: testType });
+  
+  if (checkRes.status !== 'success') {
+    return Swal.fire('ข้อผิดพลาด', checkRes.message, 'error');
+  }
+  
+  // 2. ถ้าไม่มีสิทธิ์ (เช่น สอบไปแล้ว หรือผิดเวลา) ให้เด้งแจ้งเตือนแล้วหยุดการทำงาน
+  if (!checkRes.eligible) {
+    let iconType = checkRes.reason === 'completed' ? 'success' : 'warning';
+    return Swal.fire('แจ้งเตือน', checkRes.message, iconType);
+  }
+
+  // 3. ถ้าผ่านด่านมาได้ ค่อยโหลดข้อสอบมาแสดง
   Swal.fire({ title: 'กำลังโหลดข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: 'TEST' });
   if (res.status === 'success') {
