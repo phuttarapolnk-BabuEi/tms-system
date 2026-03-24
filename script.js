@@ -131,6 +131,17 @@ async function checkInModal(dayNo, timeSlot) {
   }
 }
 
+// 📌 ฟังก์ชันสลับลำดับข้อมูล (Fisher-Yates Shuffle) สำหรับข้อสอบและตัวเลือก
+function shuffleArray(array) {
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+  return array;
+}
+
 // 📌 ฟังก์ชันใหม่: เรียกหน้าต่างทำข้อสอบ
 async function openExamModal(testType) {
   Swal.fire({ title: 'กำลังโหลดข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
@@ -143,23 +154,40 @@ async function openExamModal(testType) {
   }
 }
 
-// 📌 ฟังก์ชันใหม่: วาดหน้ากระดาษข้อสอบ
+// 📌 ฟังก์ชันใหม่: วาดหน้ากระดาษข้อสอบ (อัปเกรด: สลับข้อและสลับช้อยส์อัตโนมัติ)
 function renderExamUI(examData, testType) {
   if (examData.length === 0) return Swal.fire('แจ้งเตือน', 'ยังไม่มีข้อสอบในระบบ', 'warning');
 
   let html = `<form id="examForm" class="text-start" style="font-size: 0.95rem;">`;
   const title = testType === 'PRE' ? '📝 แบบทดสอบก่อนเรียน (Pre-Test)' : '✅ แบบทดสอบหลังเรียน (Post-Test)';
 
-  examData.forEach((q, index) => {
-    html += `<div class="mb-4 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label>`;
-    const letters = ['A', 'B', 'C', 'D', 'E']; // รองรับตัวเลือก ก ข ค ง จ (ที่ระบบแปลงเป็น A B C D)
+  // 1. สลับลำดับ "ข้อสอบ" (Shuffle Questions) ก่อนเริ่มวาด
+  let shuffledQuestions = shuffleArray([...examData]);
+
+  shuffledQuestions.forEach((q, index) => {
+    html += `<div class="mb-4 p-3 bg-white rounded border shadow-sm">
+               <label class="d-block fw-bold text-dark mb-3">ข้อ ${index + 1}. ${q.question}</label>`;
+    
+    // 2. จับคู่ตัวเลือกกับรหัสคำตอบเดิม (A, B, C, D, E) เก็บใส่กระเป๋าไว้ก่อนสลับ
+    const originalLetters = ['A', 'B', 'C', 'D', 'E'];
+    let optionsObj = [];
     q.options.forEach((opt, optIdx) => {
-      if (opt) {
-        html += `<div class="form-check mb-2">
-                   <input class="form-check-input" type="radio" name="${q.q_id}" id="${q.q_id}_${letters[optIdx]}" value="${letters[optIdx]}" required>
-                   <label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${letters[optIdx]}">${letters[optIdx]}. ${opt}</label>
-                 </div>`;
-      }
+      if (opt) optionsObj.push({ text: opt, value: originalLetters[optIdx] });
+    });
+
+    // 3. สลับลำดับ "ตัวเลือก" (Shuffle Options) ในกระเป๋า
+    optionsObj = shuffleArray(optionsObj);
+
+    // 4. วาดตัวเลือกที่สลับแล้ว โดยแสดงผลเป็น ก ข ค ง จ
+    const displayLetters = ['ก', 'ข', 'ค', 'ง', 'จ'];
+    optionsObj.forEach((opt, optIdx) => {
+      const displayChar = displayLetters[optIdx];
+      html += `<div class="form-check mb-2">
+                 <input class="form-check-input" type="radio" name="${q.q_id}" id="${q.q_id}_${opt.value}" value="${opt.value}" required>
+                 <label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${opt.value}">
+                   ${displayChar}. ${opt.text}
+                 </label>
+               </div>`;
     });
     html += `</div>`;
   });
@@ -178,6 +206,8 @@ function renderExamUI(examData, testType) {
       const res = await callAPI('submitTestScore', { personalId: currentUser.personal_id, testType: testType, answers: result.value });
       if (res.status === 'success') {
         Swal.fire({ icon: 'success', title: 'ส่งคำตอบสำเร็จ!', text: res.message, confirmButtonText: 'ยอดเยี่ยม' });
+        // 📌 (ทางเลือก) ถ้ารันผ่านหน้าแอดมิน ให้รีเฟรชตารางโชว์คะแนนใหม่ด้วย
+        if(document.getElementById('admin-view').classList.contains('d-block')) fetchProgressData(); 
       } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
     }
   });
