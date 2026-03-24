@@ -82,6 +82,7 @@ function setupDashboard() {
     } else {
       crudMenu.classList.remove('d-none'); 
       loadConfigToUI(); 
+      loadExamConfigToUI();
     }
 
   } else if (safeRole === 'MENTOR') {
@@ -95,7 +96,7 @@ function setupDashboard() {
 }
 
 // ==========================================
-// 2. Trainee View (ระบบลงเวลา + ระบบทำข้อสอบ)
+// 2. Trainee View (ระบบลงเวลา + ทำข้อสอบ)
 // ==========================================
 async function loadAttendanceUI() {
   const container = document.getElementById('attendance-buttons-container');
@@ -131,7 +132,6 @@ async function checkInModal(dayNo, timeSlot) {
   }
 }
 
-// 📌 ฟังก์ชันสลับลำดับข้อมูล (Fisher-Yates Shuffle) สำหรับข้อสอบและตัวเลือก
 function shuffleArray(array) {
   let currentIndex = array.length, randomIndex;
   while (currentIndex !== 0) {
@@ -142,24 +142,16 @@ function shuffleArray(array) {
   return array;
 }
 
-// 📌 ฟังก์ชันใหม่: เรียกหน้าต่างทำข้อสอบ (อัปเกรดมีระบบเช็กสิทธิ์และเวลา)
 async function openExamModal(testType) {
   Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  
-  // 1. ส่งไปถามระบบหลังบ้านก่อนว่า มีสิทธิ์สอบไหม? และอยู่ในเวลาไหม?
   const checkRes = await callAPI('checkExamEligibility', { personalId: currentUser.personal_id, testType: testType });
+  if (checkRes.status !== 'success') return Swal.fire('ข้อผิดพลาด', checkRes.message, 'error');
   
-  if (checkRes.status !== 'success') {
-    return Swal.fire('ข้อผิดพลาด', checkRes.message, 'error');
-  }
-  
-  // 2. ถ้าไม่มีสิทธิ์ (เช่น สอบไปแล้ว หรือผิดเวลา) ให้เด้งแจ้งเตือนแล้วหยุดการทำงาน
   if (!checkRes.eligible) {
     let iconType = checkRes.reason === 'completed' ? 'success' : 'warning';
     return Swal.fire('แจ้งเตือน', checkRes.message, iconType);
   }
 
-  // 3. ถ้าผ่านด่านมาได้ ค่อยโหลดข้อสอบมาแสดง
   Swal.fire({ title: 'กำลังโหลดข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: 'TEST' });
   if (res.status === 'success') {
@@ -170,39 +162,31 @@ async function openExamModal(testType) {
   }
 }
 
-// 📌 ฟังก์ชันใหม่: วาดหน้ากระดาษข้อสอบ (อัปเกรด: สลับข้อและสลับช้อยส์อัตโนมัติ)
 function renderExamUI(examData, testType) {
   if (examData.length === 0) return Swal.fire('แจ้งเตือน', 'ยังไม่มีข้อสอบในระบบ', 'warning');
 
   let html = `<form id="examForm" class="text-start" style="font-size: 0.95rem;">`;
   const title = testType === 'PRE' ? '📝 แบบทดสอบก่อนเรียน (Pre-Test)' : '✅ แบบทดสอบหลังเรียน (Post-Test)';
 
-  // 1. สลับลำดับ "ข้อสอบ" (Shuffle Questions) ก่อนเริ่มวาด
   let shuffledQuestions = shuffleArray([...examData]);
 
   shuffledQuestions.forEach((q, index) => {
-    html += `<div class="mb-4 p-3 bg-white rounded border shadow-sm">
-               <label class="d-block fw-bold text-dark mb-3">ข้อ ${index + 1}. ${q.question}</label>`;
+    html += `<div class="mb-4 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">ข้อ ${index + 1}. ${q.question}</label>`;
     
-    // 2. จับคู่ตัวเลือกกับรหัสคำตอบเดิม (A, B, C, D, E) เก็บใส่กระเป๋าไว้ก่อนสลับ
     const originalLetters = ['A', 'B', 'C', 'D', 'E'];
     let optionsObj = [];
     q.options.forEach((opt, optIdx) => {
       if (opt) optionsObj.push({ text: opt, value: originalLetters[optIdx] });
     });
 
-    // 3. สลับลำดับ "ตัวเลือก" (Shuffle Options) ในกระเป๋า
     optionsObj = shuffleArray(optionsObj);
-
-    // 4. วาดตัวเลือกที่สลับแล้ว โดยแสดงผลเป็น ก ข ค ง จ
     const displayLetters = ['ก', 'ข', 'ค', 'ง', 'จ'];
+
     optionsObj.forEach((opt, optIdx) => {
       const displayChar = displayLetters[optIdx];
       html += `<div class="form-check mb-2">
                  <input class="form-check-input" type="radio" name="${q.q_id}" id="${q.q_id}_${opt.value}" value="${opt.value}" required>
-                 <label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${opt.value}">
-                   ${displayChar}. ${opt.text}
-                 </label>
+                 <label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${opt.value}">${displayChar}. ${opt.text}</label>
                </div>`;
     });
     html += `</div>`;
@@ -222,14 +206,12 @@ function renderExamUI(examData, testType) {
       const res = await callAPI('submitTestScore', { personalId: currentUser.personal_id, testType: testType, answers: result.value });
       if (res.status === 'success') {
         Swal.fire({ icon: 'success', title: 'ส่งคำตอบสำเร็จ!', text: res.message, confirmButtonText: 'ยอดเยี่ยม' });
-        // 📌 (ทางเลือก) ถ้ารันผ่านหน้าแอดมิน ให้รีเฟรชตารางโชว์คะแนนใหม่ด้วย
         if(document.getElementById('admin-view').classList.contains('d-block')) fetchProgressData(); 
       } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
     }
   });
 }
 
-// แบบประเมิน (Survey)
 async function openSurveyModal() {
   Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: 'SURVEY' });
@@ -358,7 +340,7 @@ function renderPaginatedTable() {
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="15" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
@@ -528,17 +510,13 @@ function addConfigRow() {
   tbody.appendChild(tr);
 }
 
-function deleteConfigRow(btnElement) {
-  const row = btnElement.closest('tr');
-  row.remove();
-}
+function deleteConfigRow(btnElement) { btnElement.closest('tr').remove(); }
 
 async function saveConfigFromUI() {
   try {
     Swal.fire({ title: 'กำลังบันทึกการตั้งค่า...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const rows = document.querySelectorAll('#config-table-body tr');
     let newConfigData = [];
-    
     for(let tr of rows) {
       if(!tr.querySelector('.config-id')) continue; 
       const id = tr.querySelector('.config-id').value;
@@ -551,13 +529,92 @@ async function saveConfigFromUI() {
       const isActive = tr.querySelector('.config-active').checked ? 'TRUE' : 'FALSE';
       newConfigData.push([id, day, date, slotId, label, start, end, isActive]);
     }
-    
     const res = await callAPI('saveRawAttendanceConfig', { configData: newConfigData });
     if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
     else Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
-    
-  } catch (error) {
-    console.error("Save Error: ", error);
-    Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error');
-  }
+  } catch (error) { Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error'); }
+}
+
+// ==========================================
+// 6. Admin Exam Config (ตั้งค่าเปิด-ปิดข้อสอบ)
+// ==========================================
+async function loadExamConfigToUI() {
+  const tbody = document.getElementById('exam-config-table-body');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-info"></div> กำลังดึงข้อมูล...</td></tr>';
+  const res = await callAPI('getRawExamConfig');
+  
+  if (res.status === 'success') {
+    tbody.innerHTML = '';
+    const formatDT = (dtStr) => {
+      if(!dtStr) return "";
+      let d = new Date(dtStr);
+      if(isNaN(d.getTime())) {
+          d = new Date(dtStr.replace(" ", "T"));
+          if(isNaN(d.getTime())) return "";
+      }
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    res.data.forEach((row) => {
+      const isChecked = row[3].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
+      tbody.innerHTML += `
+        <tr>
+          <td>
+            <select class="form-select form-select-sm exam-type mx-auto text-center fw-bold text-secondary" style="width: 150px;">
+              <option value="PRE" ${row[0].toUpperCase() === 'PRE' ? 'selected' : ''}>PRE-TEST</option>
+              <option value="POST" ${row[0].toUpperCase() === 'POST' ? 'selected' : ''}>POST-TEST</option>
+            </select>
+          </td>
+          <td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" value="${formatDT(row[1])}" style="max-width: 220px;"></td>
+          <td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" value="${formatDT(row[2])}" style="max-width: 220px;"></td>
+          <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" style="cursor:pointer;" ${isChecked}></div></td>
+          <td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="deleteExamConfigRow(this)" title="ลบข้อมูล"><i class="bi bi-trash3-fill"></i></button></td>
+        </tr>
+      `;
+    });
+  } else { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">ยังไม่มีข้อมูลการตั้งค่าเวลาสอบ</td></tr>`; }
+}
+
+function addExamConfigRow() {
+  const tbody = document.getElementById('exam-config-table-body');
+  if(!tbody) return;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select class="form-select form-select-sm exam-type border-info mx-auto text-center fw-bold text-info" style="width: 150px;">
+        <option value="PRE">PRE-TEST</option>
+        <option value="POST">POST-TEST</option>
+      </select>
+    </td>
+    <td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" style="max-width: 220px;"></td>
+    <td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" style="max-width: 220px;"></td>
+    <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" style="cursor:pointer;" checked></div></td>
+    <td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="deleteExamConfigRow(this)" title="ลบข้อมูล"><i class="bi bi-trash3-fill"></i></button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function deleteExamConfigRow(btnElement) { btnElement.closest('tr').remove(); }
+
+async function saveExamConfigFromUI() {
+  try {
+    Swal.fire({ title: 'กำลังบันทึกการตั้งค่าข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    const rows = document.querySelectorAll('#exam-config-table-body tr');
+    let newConfigData = [];
+    const revertDT = (dtStr) => { if(!dtStr) return ""; return dtStr.replace("T", " "); };
+
+    for(let tr of rows) {
+      if(!tr.querySelector('.exam-type')) continue; 
+      const type = tr.querySelector('.exam-type').value;
+      const start = revertDT(tr.querySelector('.exam-start').value);
+      const end = revertDT(tr.querySelector('.exam-end').value);
+      const isActive = tr.querySelector('.exam-active').checked ? 'TRUE' : 'FALSE';
+      newConfigData.push([type, start, end, isActive]);
+    }
+    const res = await callAPI('saveRawExamConfig', { configData: newConfigData });
+    if (res.status === 'success') Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+    else Swal.fire('ข้อผิดพลาดจากเซิร์ฟเวอร์', res.message, 'error');
+  } catch (error) { Swal.fire('เกิดข้อผิดพลาดของระบบ', error.message, 'error'); }
 }
