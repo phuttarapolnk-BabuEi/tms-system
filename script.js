@@ -192,13 +192,12 @@ function renderExamUI(examData, testType) {
 }
 
 // ----------------- ระบบประเมิน (Evaluation System) -----------------
-// 📌 อัปเดต 1: ดึงรายชื่อวิทยากร (สั่งให้ดึงคำถามประเภท SPEAKER_SURVEY)
+// 1️⃣ ดึงรายชื่อวิทยากร
 async function openSpeakerListModal() {
   Swal.fire({ title: 'กำลังตรวจสอบวาระ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getActiveSpeakers');
   if (res.status === 'success') {
     Swal.close();
-    
     const now = new Date();
     let activeNow = [];
     res.data.forEach(spk => {
@@ -208,12 +207,11 @@ async function openSpeakerListModal() {
           if(now >= startTime && now <= endTime) { activeNow.push(spk); }
        }
     });
-
     if(activeNow.length === 0) return Swal.fire('แจ้งเตือน', 'ยังไม่มีวาระการประเมินวิทยากรในขณะนี้ครับ 🔒', 'info');
     
     let html = '<div class="d-flex flex-column gap-2">';
     activeNow.forEach(spk => {
-      // 📌 ส่งคำสั่ง 'SPEAKER_SURVEY' พ่วงไปด้วย
+      // 📌 ส่งคำว่า 'SPEAKER_SURVEY' แนบไปตอนกดปุ่ม
       html += `<button class="btn btn-outline-warning text-dark text-start shadow-sm fw-bold border-2" onclick="Swal.close(); openSurveyModal('${spk.id}', 'ประเมิน: ${spk.name}', 'SPEAKER_SURVEY')">
                  <i class="bi bi-person-video3"></i> ${spk.name} <br><small class="text-muted fw-normal">หัวข้อ: ${spk.topic}</small>
                </button>`;
@@ -223,11 +221,12 @@ async function openSpeakerListModal() {
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
-// 📌 อัปเดต 2: โหลดแบบประเมิน (รองรับการรับค่าประเภทคำถาม qType)
+// 2️⃣ โหลดแบบประเมิน
+// 📌 รับตัวแปร surveyType เข้ามา แล้วส่งไปบอกเซิร์ฟเวอร์
 async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJECT_SURVEY') {
   Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   
-  // 📌 ส่งประเภทแบบประเมินไปถามหลังบ้าน (ถ้ากดวิทยากร จะเป็น SPEAKER_SURVEY, ถ้ากดโครงการจะเป็น PROJECT_SURVEY)
+  // ยิงคำสั่ง qType: surveyType ไปที่ Code.gs
   const res = await callAPI('getQuestions', { qType: surveyType }); 
   
   if (res.status === 'success') { 
@@ -237,22 +236,13 @@ async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJE
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
-async function openSurveyModal(targetId, customTitle = null) {
-  Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  const res = await callAPI('getQuestions', { qType: 'SURVEY' });
-  if (res.status === 'success') { 
-    Swal.close(); 
-    const title = customTitle || '📝 แบบประเมินภาพรวมโครงการ';
-    renderSurveyUI(res.data, targetId, title); 
-  } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
-}
-
+// 3️⃣ วาดหน้าต่างแบบประเมิน
 function renderSurveyUI(surveyData, targetId, title) {
+  // 📌 ดักจับหน้าจอขาว! ถ้าไม่มีคำถาม ให้เด้งเตือนแอดมินแทน
   if (!surveyData || surveyData.length === 0) {
-    return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ (โปรดตั้งค่าในชีต Questions_Bank)', 'warning');
+    return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ (โปรดตรวจดูชีต Questions_Bank ว่าพิมพ์ถูกไหม)', 'warning');
   }
 
-  const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   let html = '<form id="satisfactionForm" class="text-start" style="font-size: 0.95rem;">';
   let sectionNumber = 1;
