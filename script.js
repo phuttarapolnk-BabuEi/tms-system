@@ -16,6 +16,8 @@ let mentorChartInstance = null;
 let mentorCurrentPage = 1;
 
 let globalEvalData = null; // เก็บข้อมูลประเมินทั้งหมด (Admin)
+let preChartInstance = null; // เก็บกราฟ Pre-Test
+let postChartInstance = null; // เก็บกราฟ Post-Test
 
 // ==========================================
 // 📌 2. ฟังก์ชันหลัก (Core Functions)
@@ -219,6 +221,7 @@ function renderSurveyUI(surveyData, targetId, title) {
     html += `<div class="mt-4 mb-3 border-bottom border-2 border-primary pb-2"><h6 class="fw-bold text-primary mb-0">ส่วนที่ ${sectionNumber}: ${category}</h6></div>`;
     questions.forEach((q, index) => {
       html += `<div class="mb-3 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label>`;
+      
       if (q.input_type === 'TEXT') {
         html += `<textarea class="form-control" name="${q.q_id}" rows="3" placeholder="พิมพ์ข้อเสนอแนะที่นี่..." required></textarea>`;
       } else {
@@ -298,44 +301,83 @@ async function fetchProgressData() {
 
 function filterProgressTable() {
   const keyword = document.getElementById('search-progress').value.toLowerCase(); const selectedGroup = document.getElementById('filter-group-target').value;
-  filteredProgressData = globalProgressData.filter(p => { return (p.name.toLowerCase().includes(keyword) || p.id.toString().includes(keyword)) && (selectedGroup === 'ALL' || p.group.toString() === selectedGroup); });
+  filteredProgressData = globalProgressData.filter(p => {
+    const matchKeyword = p.name.toLowerCase().includes(keyword) || p.id.toString().includes(keyword);
+    const matchGroup = selectedGroup === 'ALL' || p.group.toString() === selectedGroup;
+    return matchKeyword && matchGroup;
+  });
   currentPage = 1; renderPaginatedTable();
 }
 
 function renderPaginatedTable() {
-  const tbody = document.getElementById('progress-table-body'); tbody.innerHTML = '';
-  if (filteredProgressData.length === 0) { tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'; return; }
-  const totalPages = Math.ceil(filteredProgressData.length / rowsPerPage); const startIdx = (currentPage - 1) * rowsPerPage; const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
-  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>'; const crossMark = '<span class="text-muted opacity-25">-</span>';
+  const tbody = document.getElementById('progress-table-body');
+  tbody.innerHTML = '';
+  
+  if (filteredProgressData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
+    document.getElementById('pagination-controls').innerHTML = '';
+    return;
+  }
+  
+  const totalPages = Math.ceil(filteredProgressData.length / rowsPerPage);
+  const startIdx = (currentPage - 1) * rowsPerPage;
+  const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
+
+  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>';
+  const crossMark = '<span class="text-muted opacity-25">-</span>';
 
   paginatedItems.forEach(p => { 
-    const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || {};    
+    const att = p.attendance || {}; 
+    const test = p.testScore || {}; 
+    const surv = p.survey || {};    
     let count = 0; 
-    const checkSlot = (day, time) => { if (att[day] && att[day][time]) { count++; return checkMark; } return crossMark; };
+    
+    const checkSlot = (day, time) => {
+      if (att[day] && att[day][time]) { count++; return checkMark; }
+      return crossMark;
+    };
+    
     const d1m = checkSlot('1', 'Morning'); const d1a = checkSlot('1', 'Afternoon'); const d1e = checkSlot('1', 'Evening');
     const d2m = checkSlot('2', 'Morning'); const d2a = checkSlot('2', 'Afternoon'); const d2e = checkSlot('2', 'Evening');
     const d3m = checkSlot('3', 'Morning');
+
     const percentage = Math.round((count / 7) * 100);
     const badgeColor = percentage >= 80 ? 'bg-success' : (percentage >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+
     const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
     const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
+
     const evalSpeaker = surv.speaker ? '<span class="badge bg-success">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     const evalProject = surv.project ? '<span class="badge bg-success">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
-    tbody.innerHTML += `<tr>
-        <td><code>${p.id}</code></td><td class="text-start">${p.name}</td><td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
-        <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td><td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td><td class="border-end">${d3m}</td>
-        <td class="fw-bold bg-light border-start">${count}</td><td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
-        <td>${preScore}</td><td>${evalSpeaker}</td><td>${postScore}</td><td>${evalProject}</td>
-      </tr>`; 
+    tbody.innerHTML += `
+      <tr>
+        <td><code>${p.id}</code></td>
+        <td class="text-start">${p.name}</td>
+        <td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
+        <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
+        <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
+        <td class="border-end">${d3m}</td>
+        <td class="fw-bold bg-light border-start">${count}</td>
+        <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
+        <td>${preScore}</td>
+        <td>${evalSpeaker}</td>
+        <td>${postScore}</td>
+        <td>${evalProject}</td>
+      </tr>
+    `; 
   });
+  
   document.getElementById('pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredProgressData.length)} จากทั้งหมด ${filteredProgressData.length} รายการ`;
   renderPaginationControls(totalPages, 'admin');
 }
 
 function renderPaginationControls(totalPages, role = 'admin') {
   const ul = document.getElementById(role === 'admin' ? 'pagination-controls' : 'mentor-pagination-controls');
-  const current = role === 'admin' ? currentPage : mentorCurrentPage; const changeFunc = role === 'admin' ? 'changePage' : 'changeMentorPage';
+  const current = role === 'admin' ? currentPage : mentorCurrentPage;
+  const changeFunc = role === 'admin' ? 'changePage' : 'changeMentorPage';
+  
   ul.innerHTML = `<li class="page-item ${current === 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="${changeFunc}(${current - 1}); return false;">ก่อนหน้า</a></li>`;
   for (let i = 1; i <= totalPages; i++) { ul.innerHTML += `<li class="page-item ${i === current ? 'active' : ''}"><a class="page-link" href="#" onclick="${changeFunc}(${i}); return false;">${i}</a></li>`; }
   ul.innerHTML += `<li class="page-item ${current === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="${changeFunc}(${current + 1}); return false;">ถัดไป</a></li>`;
@@ -343,7 +385,70 @@ function renderPaginationControls(totalPages, role = 'admin') {
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
 // ----------------------------------------
-// 📌 Admin: สรุปผลประเมิน (X̄ / S.D. / ข้อเขียน)
+// 📌 Admin: สรุปผลคะแนนสอบ (Pre-Test / Post-Test) พร้อมกราฟ
+// ----------------------------------------
+function renderTestSummary(type) {
+  if (!globalProgressData || globalProgressData.length === 0) return;
+  let scores = []; let maxScore = 0;
+
+  globalProgressData.forEach(p => {
+     const testData = p.testScore[type]; 
+     if (testData) {
+        const parts = testData.split('/');
+        const s = parseFloat(parts[0]); const m = parseFloat(parts[1]);
+        if (!isNaN(s)) { scores.push(s); maxScore = m; }
+     }
+  });
+
+  const containerId = type === 'PRE' ? 'pretest-stats-container' : 'posttest-stats-container';
+  const canvasId = type === 'PRE' ? 'pretestChart' : 'posttestChart';
+  const container = document.getElementById(containerId);
+
+  if (scores.length === 0) {
+     container.innerHTML = `<div class="col-12"><div class="alert alert-warning text-center shadow-sm border-0"><i class="bi bi-info-circle"></i> ยังไม่มีผู้เข้าอบรมทำแบบทดสอบนี้ครับ</div></div>`;
+     const ctx = document.getElementById(canvasId);
+     if (type === 'PRE' && preChartInstance) preChartInstance.destroy();
+     if (type === 'POST' && postChartInstance) postChartInstance.destroy();
+     return;
+  }
+
+  const N = scores.length;
+  const maxVal = Math.max(...scores); const minVal = Math.min(...scores);
+  const mean = scores.reduce((a,b)=>a+b,0) / N;
+  let sd = 0; if (N > 1) sd = Math.sqrt(scores.reduce((a,b)=>a+Math.pow(b-mean,2),0) / (N-1));
+
+  const themeColor = type === 'PRE' ? 'info' : 'success';
+  const textColor = type === 'PRE' ? 'dark' : 'white';
+
+  container.innerHTML = `
+    <div class="col-md-3"><div class="card bg-primary text-white border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">จำนวนผู้เข้าสอบ</h6><h2 class="mb-0 fw-bold">${N} <small class="fs-6 fw-normal">คน</small></h2></div></div></div>
+    <div class="col-md-3"><div class="card bg-${themeColor} text-${textColor} border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">คะแนนเฉลี่ย (X̄)</h6><h2 class="mb-0 fw-bold">${mean.toFixed(2)} <small class="fs-6 fw-normal">/ ${maxScore}</small></h2></div></div></div>
+    <div class="col-md-3"><div class="card bg-warning text-dark border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">คะแนนสูงสุด - ต่ำสุด</h6><h2 class="mb-0 fw-bold">${maxVal} - ${minVal}</h2></div></div></div>
+    <div class="col-md-3"><div class="card bg-dark text-white border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">ส่วนเบี่ยงเบน (S.D.)</h6><h2 class="mb-0 fw-bold">${sd.toFixed(2)}</h2></div></div></div>
+  `;
+
+  let scoreCounts = {};
+  scores.forEach(s => { scoreCounts[s] = (scoreCounts[s] || 0) + 1; });
+  const labels = Object.keys(scoreCounts).sort((a,b)=>a-b); 
+  const data = labels.map(l => scoreCounts[l]);
+
+  const ctx = document.getElementById(canvasId);
+  const chartColor = type === 'PRE' ? '#0dcaf0' : '#198754'; 
+
+  if (type === 'PRE' && preChartInstance) preChartInstance.destroy();
+  if (type === 'POST' && postChartInstance) postChartInstance.destroy();
+
+  const newChart = new Chart(ctx, {
+     type: 'bar',
+     data: { labels: labels.map(l => `ได้ ${l} คะแนน`), datasets: [{ label: 'จำนวนผู้สอบ (คน)', data: data, backgroundColor: chartColor, borderRadius: 6 }] },
+     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+
+  if (type === 'PRE') preChartInstance = newChart; else postChartInstance = newChart;
+}
+
+// ----------------------------------------
+// 📌 Admin: สรุปผลประเมิน (X̄ / S.D. / ข้อเขียน / Accordion)
 // ----------------------------------------
 async function fetchEvaluationSummary() {
   const container = document.getElementById('eval-detail-container');
@@ -359,7 +464,6 @@ async function fetchEvaluationSummary() {
   } else { container.innerHTML = `<div class="text-danger text-center py-5">เกิดข้อผิดพลาด: ${res.message}</div>`; }
 }
 
-// 📌 วาดตารางและข้อเขียนรายข้อ (อัปเกรด: เป็นรูปแบบพับเก็บได้ Collapsible Accordion)
 function renderEvaluationDetail() {
   const targetId = document.getElementById('eval-target-select').value;
   const container = document.getElementById('eval-detail-container');
@@ -379,44 +483,37 @@ function renderEvaluationDetail() {
   for (let qId in questions) { if (questions[qId].type === expectedQType) targetQuestions.push({ q_id: qId, ...questions[qId] }); }
 
   let html = `<div class="mb-3 text-end"><span class="badge bg-primary fs-6 shadow-sm">จำนวนผู้ประเมิน: ${N} คน</span></div>`;
-  
-  // 📌 เริ่มต้นสร้าง Accordion (เมนูพับได้) สำหรับตารางคะแนน
   html += `<div class="accordion" id="evalAccordion">`;
   
   const categories = [...new Set(targetQuestions.map(q => q.category))];
   let textResponses = []; 
-  let catIndex = 0; // สร้างตัวแปรไว้นับรหัสกล่องเพื่อไม่ให้มันพับมั่วกัน
+  let catIndex = 0; 
 
   categories.forEach(cat => {
     const catQuestions = targetQuestions.filter(q => q.category === cat);
     const radioQuestions = catQuestions.filter(q => q.inputType !== 'TEXT');
     const textQuestions = catQuestions.filter(q => q.inputType === 'TEXT');
     
-    // เก็บข้อเขียนลงกระเป๋าไว้โชว์ด้านล่าง
     textQuestions.forEach(q => {
       let texts = [];
       targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); });
       textResponses.push({ question: q.text, answers: texts });
     });
 
-    // ถ่ามีข้อที่เป็นตัวเลข ค่อยสร้างตาราง (ใส่ในกล่อง Accordion)
     if (radioQuestions.length > 0) {
-      const collapseId = `collapse-cat-${catIndex}`; // ตั้งชื่อกล่อง
-      
-      html += `
-        <div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
-          <h2 class="accordion-header" id="heading-${collapseId}">
-            <button class="accordion-button bg-white fw-bold text-success border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
-              <i class="bi bi-bookmark-check-fill me-2"></i> ${cat}
-            </button>
-          </h2>
-          <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
-            <div class="accordion-body p-0">
-              <div class="table-responsive m-0">
-                <table class="table table-bordered table-hover align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;">
-                  <thead class="table-light"><tr><th style="width:60%;" class="ps-4">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead>
-                  <tbody>
-      `;
+      const collapseId = `collapse-cat-${catIndex}`; 
+      html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
+                 <h2 class="accordion-header" id="heading-${collapseId}">
+                   <button class="accordion-button bg-white fw-bold text-success border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
+                     <i class="bi bi-bookmark-check-fill me-2"></i> ${cat}
+                   </button>
+                 </h2>
+                 <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
+                   <div class="accordion-body p-0">
+                     <div class="table-responsive m-0">
+                       <table class="table table-bordered table-hover align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;">
+                         <thead class="table-light"><tr><th style="width:60%;" class="ps-4">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead>
+                         <tbody>`;
       
       radioQuestions.forEach(q => {
         let scores = [];
@@ -432,32 +529,26 @@ function renderEvaluationDetail() {
 
         html += `<tr><td class="ps-4">${q.text}</td><td class="text-center fw-bold text-primary">${count > 0 ? mean.toFixed(2) : '-'}</td><td class="text-center text-muted">${count > 0 ? sd.toFixed(2) : '-'}</td><td class="text-center"><span class="badge ${mean >= 3.5 ? 'bg-success' : 'bg-warning text-dark'}">${count > 0 ? interpret(mean) : '-'}</span></td></tr>`;
       });
-      
       html += `</tbody></table></div></div></div></div>`;
       catIndex++;
     }
   });
-  
-  html += `</div>`; // ปิดกล่อง Accordion สำหรับตาราง
+  html += `</div>`; 
 
-  // 📌 โซนข้อเขียนด้านล่างสุด (จับยัดใส่กล่อง Accordion ด้วยเช่นกัน)
   if (textResponses.length > 0) {
      html += `<h6 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-chat-quote-fill"></i> ข้อเสนอแนะปลายเปิด (รายข้อ)</h6>`;
      html += `<div class="accordion" id="textAccordion">`;
-     
      textResponses.forEach((tr, i) => {
         const collapseId = `collapse-text-${i}`;
-        html += `
-          <div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
-            <h2 class="accordion-header" id="heading-${collapseId}">
-              <button class="accordion-button bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
-                ${i+1}. ${tr.question}
-              </button>
-            </h2>
-            <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
-              <div class="accordion-body p-0">
-                <ul class="list-group list-group-flush">
-        `;
+        html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
+                   <h2 class="accordion-header" id="heading-${collapseId}">
+                     <button class="accordion-button bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
+                       ${i+1}. ${tr.question}
+                     </button>
+                   </h2>
+                   <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
+                     <div class="accordion-body p-0">
+                       <ul class="list-group list-group-flush">`;
         if(tr.answers.length === 0) { html += `<li class="list-group-item text-muted text-center small py-3">- ไม่มีผู้ให้ข้อเสนอแนะ -</li>`; } 
         else { tr.answers.forEach(ans => { html += `<li class="list-group-item small px-4"><i class="bi bi-arrow-right-short text-success fs-5"></i> ${ans}</li>`; }); }
         html += `</ul></div></div></div>`;
@@ -514,14 +605,6 @@ function handleImportCSV() {
     else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
   };
   reader.readAsText(file, 'UTF-8');
-}
-
-async function handleExportCSV() {
-  Swal.fire({ title: 'กำลังดึงข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  const res = await callAPI('exportCSV');
-  if (res.status === 'success') {
-    Swal.close(); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob(["\uFEFF" + res.csvData], { type: 'text/csv;charset=utf-8;' })); link.download = res.filename; link.click();
-  } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
 async function loadConfigToUI() {
