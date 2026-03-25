@@ -248,6 +248,11 @@ async function openSurveyModal(targetId, customTitle = null) {
 }
 
 function renderSurveyUI(surveyData, targetId, title) {
+  if (!surveyData || surveyData.length === 0) {
+    return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ (โปรดตั้งค่าในชีต Questions_Bank)', 'warning');
+  }
+
+  const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   let html = '<form id="satisfactionForm" class="text-start" style="font-size: 0.95rem;">';
   let sectionNumber = 1;
