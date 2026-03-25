@@ -237,8 +237,8 @@ async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJE
 }
 
 // 3️⃣ วาดหน้าต่างแบบประเมิน
+// 📌 วาดหน้าต่างแบบประเมิน (รองรับข้อเขียนปลายเปิด)
 function renderSurveyUI(surveyData, targetId, title) {
-  // 📌 ดักจับหน้าจอขาว! ถ้าไม่มีคำถาม ให้เด้งเตือนแอดมินแทน
   if (!surveyData || surveyData.length === 0) {
     return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ (โปรดตรวจดูชีต Questions_Bank ว่าพิมพ์ถูกไหม)', 'warning');
   }
@@ -246,20 +246,36 @@ function renderSurveyUI(surveyData, targetId, title) {
   const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
   let html = '<form id="satisfactionForm" class="text-start" style="font-size: 0.95rem;">';
   let sectionNumber = 1;
+  
   for (const [category, questions] of Object.entries(groupedData)) {
     html += `<div class="mt-4 mb-3 border-bottom border-2 border-primary pb-2"><h6 class="fw-bold text-primary mb-0">ส่วนที่ ${sectionNumber}: ${category}</h6></div>`;
     questions.forEach((q, index) => {
-      html += `<div class="mb-3 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label><div class="d-flex justify-content-between px-1 px-md-4">`;
-      [5, 4, 3, 2, 1].forEach(score => { html += `<div class="form-check text-center m-0 p-0"><input class="form-check-input float-none m-0" type="radio" name="${q.q_id}" value="${score}" required><label class="d-block small mt-1 text-muted">${score}</label></div>`; });
-      html += `</div></div>`;
-    }); sectionNumber++;
-  } html += '</form>';
+      html += `<div class="mb-3 p-3 bg-white rounded border shadow-sm"><label class="d-block fw-bold text-dark mb-3">${index + 1}. ${q.question}</label>`;
+      
+      // 📌 เช็กสวิตช์! ถ้าในชีตพิมพ์ TEXT ให้สร้างกล่องเขียนข้อความ
+      if (q.input_type === 'TEXT') {
+        html += `<textarea class="form-control" name="${q.q_id}" rows="3" placeholder="พิมพ์ข้อเสนอแนะที่นี่..." required></textarea>`;
+      } 
+      // 📌 ถ้าไม่ใช่ TEXT ให้สร้างปุ่ม 5-4-3-2-1 ปกติ
+      else {
+        html += `<div class="d-flex justify-content-between px-1 px-md-4">`;
+        [5, 4, 3, 2, 1].forEach(score => { 
+          html += `<div class="form-check text-center m-0 p-0"><input class="form-check-input float-none m-0" type="radio" name="${q.q_id}" value="${score}" required><label class="d-block small mt-1 text-muted">${score}</label></div>`; 
+        });
+        html += `</div>`;
+      }
+      
+      html += `</div>`;
+    }); 
+    sectionNumber++;
+  } 
+  html += '</form>';
 
   Swal.fire({
     title: title, html: html, width: '800px', showCancelButton: true, confirmButtonText: 'ส่งแบบประเมิน', customClass: { popup: 'rounded-4 bg-light' },
     preConfirm: () => {
       const form = document.getElementById('satisfactionForm');
-      if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบแบบประเมินให้ครบ'); return false; }
+      if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบแบบประเมินให้ครบทุกข้อ'); return false; }
       return Object.fromEntries(new FormData(form).entries());
     }
   }).then(async (result) => { 
