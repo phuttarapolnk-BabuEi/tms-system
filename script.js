@@ -192,6 +192,7 @@ function renderExamUI(examData, testType) {
 }
 
 // ----------------- ระบบประเมิน (Evaluation System) -----------------
+// 📌 อัปเดต 1: ดึงรายชื่อวิทยากร (สั่งให้ดึงคำถามประเภท SPEAKER_SURVEY)
 async function openSpeakerListModal() {
   Swal.fire({ title: 'กำลังตรวจสอบวาระ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getActiveSpeakers');
@@ -200,15 +201,11 @@ async function openSpeakerListModal() {
     
     const now = new Date();
     let activeNow = [];
-    
-    // 📌 คัดกรองเอาเฉพาะวิทยากรที่อยู่ในช่วงเวลาปัจจุบัน
     res.data.forEach(spk => {
        if(spk.start && spk.end) {
           const startTime = new Date(spk.start);
           const endTime = new Date(spk.end);
-          if(now >= startTime && now <= endTime) {
-            activeNow.push(spk);
-          }
+          if(now >= startTime && now <= endTime) { activeNow.push(spk); }
        }
     });
 
@@ -216,12 +213,27 @@ async function openSpeakerListModal() {
     
     let html = '<div class="d-flex flex-column gap-2">';
     activeNow.forEach(spk => {
-      html += `<button class="btn btn-outline-warning text-dark text-start shadow-sm fw-bold border-2" onclick="Swal.close(); openSurveyModal('${spk.id}', 'ประเมิน: ${spk.name}')">
+      // 📌 ส่งคำสั่ง 'SPEAKER_SURVEY' พ่วงไปด้วย
+      html += `<button class="btn btn-outline-warning text-dark text-start shadow-sm fw-bold border-2" onclick="Swal.close(); openSurveyModal('${spk.id}', 'ประเมิน: ${spk.name}', 'SPEAKER_SURVEY')">
                  <i class="bi bi-person-video3"></i> ${spk.name} <br><small class="text-muted fw-normal">หัวข้อ: ${spk.topic}</small>
                </button>`;
     });
     html += '</div>';
     Swal.fire({ title: 'เลือกวิทยากรที่ต้องการประเมิน', html: html, showConfirmButton: false });
+  } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
+}
+
+// 📌 อัปเดต 2: โหลดแบบประเมิน (รองรับการรับค่าประเภทคำถาม qType)
+async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJECT_SURVEY') {
+  Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  
+  // 📌 ส่งประเภทแบบประเมินไปถามหลังบ้าน (ถ้ากดวิทยากร จะเป็น SPEAKER_SURVEY, ถ้ากดโครงการจะเป็น PROJECT_SURVEY)
+  const res = await callAPI('getQuestions', { qType: surveyType }); 
+  
+  if (res.status === 'success') { 
+    Swal.close(); 
+    const title = customTitle || '📝 แบบประเมิน';
+    renderSurveyUI(res.data, targetId, title); 
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
