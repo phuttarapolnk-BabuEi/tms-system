@@ -588,6 +588,7 @@ async function saveExamConfigFromUI() {
 }
 
 // -- 3. ตารางตั้งค่าวิทยากร (Speaker Config) --
+// 📌 ฝั่ง Admin: โหลดตารางวิทยากร (ปรับขนาดความกว้างกล่องข้อความให้พอดี)
 async function loadSpeakerConfigToUI() {
   const tbody = document.getElementById('speaker-config-table-body');
   if(!tbody) return;
@@ -605,10 +606,13 @@ async function loadSpeakerConfigToUI() {
       const isChecked = row[5].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
       tbody.innerHTML += `<tr>
         <td><input type="text" class="form-control form-control-sm spk-id mx-auto text-center fw-bold" value="${row[0]}" style="width: 90px;"></td>
-        <td><input type="text" class="form-control form-control-sm spk-name" value="${row[1]}" placeholder="ชื่อ-สกุล"></td>
-        <td><input type="text" class="form-control form-control-sm spk-topic" value="${row[2]}" placeholder="หัวข้อ"></td>
-        <td><input type="datetime-local" class="form-control form-control-sm spk-start mx-auto" value="${formatDT(row[3])}" style="width: 140px;"></td>
-        <td><input type="datetime-local" class="form-control form-control-sm spk-end mx-auto" value="${formatDT(row[4])}" style="width: 140px;"></td>
+        <td><input type="text" class="form-control form-control-sm spk-name" value="${row[1]}" placeholder="ชื่อ-สกุล" style="min-width: 180px;"></td>
+        
+        <td><input type="text" class="form-control form-control-sm spk-topic" value="${row[2]}" placeholder="หัวข้อ" style="min-width: 250px;"></td>
+        
+        <td><input type="datetime-local" class="form-control form-control-sm spk-start mx-auto" value="${formatDT(row[3])}" style="min-width: 180px;"></td>
+        <td><input type="datetime-local" class="form-control form-control-sm spk-end mx-auto" value="${formatDT(row[4])}" style="min-width: 180px;"></td>
+        
         <td><div class="form-check form-switch d-flex justify-content-center"><input class="form-check-input spk-active" type="checkbox" ${isChecked}></div></td>
         <td><button class="btn btn-sm btn-outline-danger rounded-circle" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>
       </tr>`;
@@ -617,6 +621,7 @@ async function loadSpeakerConfigToUI() {
 }
 
 // ใช้ createElement
+// 📌 ฝั่ง Admin: เพิ่มแถววิทยากร (ปรับขนาดให้ตรงกันกับตอนโหลด)
 function addSpeakerConfigRow() {
   const tbody = document.getElementById('speaker-config-table-body');
   if(!tbody) return;
@@ -624,10 +629,10 @@ function addSpeakerConfigRow() {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td><input type="text" class="form-control form-control-sm spk-id mx-auto text-center fw-bold" value="${newId}" style="width: 90px;"></td>
-    <td><input type="text" class="form-control form-control-sm spk-name" placeholder="ชื่อ-สกุล"></td>
-    <td><input type="text" class="form-control form-control-sm spk-topic" placeholder="หัวข้อที่บรรยาย"></td>
-    <td><input type="datetime-local" class="form-control form-control-sm spk-start mx-auto" style="width: 140px;"></td>
-    <td><input type="datetime-local" class="form-control form-control-sm spk-end mx-auto" style="width: 140px;"></td>
+    <td><input type="text" class="form-control form-control-sm spk-name" placeholder="ชื่อ-สกุล" style="min-width: 180px;"></td>
+    <td><input type="text" class="form-control form-control-sm spk-topic" placeholder="หัวข้อที่บรรยาย" style="min-width: 250px;"></td>
+    <td><input type="datetime-local" class="form-control form-control-sm spk-start mx-auto" style="min-width: 180px;"></td>
+    <td><input type="datetime-local" class="form-control form-control-sm spk-end mx-auto" style="min-width: 180px;"></td>
     <td><div class="form-check form-switch d-flex justify-content-center"><input class="form-check-input spk-active" type="checkbox" checked></div></td>
     <td><button class="btn btn-sm btn-outline-danger rounded-circle" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>
   `;
