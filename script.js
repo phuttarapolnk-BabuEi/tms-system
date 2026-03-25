@@ -593,13 +593,17 @@ async function loadExamConfigToUI() {
 }
 
 function addExamConfigRow() {
-  document.getElementById('exam-config-table-body').innerHTML += `<tr>
+  const tbody = document.getElementById('exam-config-table-body');
+  if(!tbody) return;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
     <td><select class="form-select form-select-sm exam-type border-info mx-auto text-center fw-bold text-info" style="width: 150px;"><option value="PRE">PRE-TEST</option><option value="POST">POST-TEST</option></select></td>
     <td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" style="max-width: 220px;"></td>
     <td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" style="max-width: 220px;"></td>
     <td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" checked></div></td>
     <td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>
-  </tr>`;
+  `;
+  tbody.appendChild(tr);
 }
 
 async function saveExamConfigFromUI() {
@@ -642,14 +646,18 @@ async function loadSpeakerConfigToUI() {
 }
 
 function addSpeakerConfigRow() {
+  const tbody = document.getElementById('speaker-config-table-body');
+  if(!tbody) return;
   const newId = 'SPK-' + Math.floor(Math.random() * 1000);
-  document.getElementById('speaker-config-table-body').innerHTML += `<tr>
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
     <td><input type="text" class="form-control form-control-sm spk-id mx-auto text-center fw-bold" value="${newId}" style="width: 100px;"></td>
     <td><input type="text" class="form-control form-control-sm spk-name" placeholder="ชื่อ-สกุล"></td>
     <td><input type="text" class="form-control form-control-sm spk-topic" placeholder="หัวข้อที่บรรยาย"></td>
     <td><div class="form-check form-switch d-flex justify-content-center"><input class="form-check-input spk-active" type="checkbox" checked></div></td>
     <td><button class="btn btn-sm btn-outline-danger rounded-circle" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>
-  </tr>`;
+  `;
+  tbody.appendChild(tr);
 }
 
 async function saveSpeakerConfigFromUI() {
