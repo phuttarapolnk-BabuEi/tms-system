@@ -382,17 +382,25 @@ function renderEvaluationDetail() {
   let textResponses = []; 
 
   categories.forEach(cat => {
-    html += `<h6 class="fw-bold text-success mt-4 mb-2"><i class="bi bi-bookmark-check"></i> ${cat}</h6>`;
-    html += `<div class="table-responsive mb-4"><table class="table table-bordered table-hover align-middle bg-white shadow-sm" style="font-size:0.9rem;">`;
-    html += `<thead class="table-light"><tr><th style="width:60%;">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead><tbody>`;
-    
+    // 📌 กรองแยกประเภทข้อสอบในหมวดหมู่นั้นๆ
     const catQuestions = targetQuestions.filter(q => q.category === cat);
-    catQuestions.forEach(q => {
-      if (q.inputType === 'TEXT') {
-        let texts = [];
-        targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); });
-        textResponses.push({ question: q.text, answers: texts });
-      } else {
+    const radioQuestions = catQuestions.filter(q => q.inputType !== 'TEXT');
+    const textQuestions = catQuestions.filter(q => q.inputType === 'TEXT');
+    
+    // 1. เก็บข้อเขียนลงกระเป๋าไว้โชว์ด้านล่าง
+    textQuestions.forEach(q => {
+      let texts = [];
+      targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); });
+      textResponses.push({ question: q.text, answers: texts });
+    });
+
+    // 2. 📌 สำคัญ! ถ่ามีข้อที่เป็นตัวเลข (Radio) อย่างน้อย 1 ข้อ ค่อยวาดตารางและหัวตาราง
+    if (radioQuestions.length > 0) {
+      html += `<h6 class="fw-bold text-success mt-4 mb-2"><i class="bi bi-bookmark-check"></i> ${cat}</h6>`;
+      html += `<div class="table-responsive mb-4"><table class="table table-bordered table-hover align-middle bg-white shadow-sm" style="font-size:0.9rem;">`;
+      html += `<thead class="table-light"><tr><th style="width:60%;">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead><tbody>`;
+      
+      radioQuestions.forEach(q => {
         let scores = [];
         targetSurveys.forEach(s => { const val = parseFloat(s.answers[q.q_id]); if(!isNaN(val)) scores.push(val); });
         
@@ -405,11 +413,12 @@ function renderEvaluationDetail() {
         const interpret = (m) => { if(m >= 4.5) return 'มากที่สุด'; if(m >= 3.5) return 'มาก'; if(m >= 2.5) return 'ปานกลาง'; if(m >= 1.5) return 'น้อย'; return 'ปรับปรุง'; };
 
         html += `<tr><td>${q.text}</td><td class="text-center fw-bold text-primary">${count > 0 ? mean.toFixed(2) : '-'}</td><td class="text-center text-muted">${count > 0 ? sd.toFixed(2) : '-'}</td><td class="text-center"><span class="badge ${mean >= 3.5 ? 'bg-success' : 'bg-warning text-dark'}">${count > 0 ? interpret(mean) : '-'}</span></td></tr>`;
-      }
-    });
-    html += `</tbody></table></div>`;
+      });
+      html += `</tbody></table></div>`;
+    }
   });
 
+  // วาดโซนข้อเขียนด้านล่างสุด
   if (textResponses.length > 0) {
      html += `<h6 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-chat-quote-fill"></i> ข้อเสนอแนะปลายเปิด (รายข้อ)</h6>`;
      textResponses.forEach((tr, i) => {
