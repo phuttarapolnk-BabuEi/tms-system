@@ -359,6 +359,7 @@ async function fetchEvaluationSummary() {
   } else { container.innerHTML = `<div class="text-danger text-center py-5">เกิดข้อผิดพลาด: ${res.message}</div>`; }
 }
 
+// 📌 วาดตารางและข้อเขียนรายข้อ (อัปเกรด: เป็นรูปแบบพับเก็บได้ Collapsible Accordion)
 function renderEvaluationDetail() {
   const targetId = document.getElementById('eval-target-select').value;
   const container = document.getElementById('eval-detail-container');
@@ -378,27 +379,44 @@ function renderEvaluationDetail() {
   for (let qId in questions) { if (questions[qId].type === expectedQType) targetQuestions.push({ q_id: qId, ...questions[qId] }); }
 
   let html = `<div class="mb-3 text-end"><span class="badge bg-primary fs-6 shadow-sm">จำนวนผู้ประเมิน: ${N} คน</span></div>`;
+  
+  // 📌 เริ่มต้นสร้าง Accordion (เมนูพับได้) สำหรับตารางคะแนน
+  html += `<div class="accordion" id="evalAccordion">`;
+  
   const categories = [...new Set(targetQuestions.map(q => q.category))];
   let textResponses = []; 
+  let catIndex = 0; // สร้างตัวแปรไว้นับรหัสกล่องเพื่อไม่ให้มันพับมั่วกัน
 
   categories.forEach(cat => {
-    // 📌 กรองแยกประเภทข้อสอบในหมวดหมู่นั้นๆ
     const catQuestions = targetQuestions.filter(q => q.category === cat);
     const radioQuestions = catQuestions.filter(q => q.inputType !== 'TEXT');
     const textQuestions = catQuestions.filter(q => q.inputType === 'TEXT');
     
-    // 1. เก็บข้อเขียนลงกระเป๋าไว้โชว์ด้านล่าง
+    // เก็บข้อเขียนลงกระเป๋าไว้โชว์ด้านล่าง
     textQuestions.forEach(q => {
       let texts = [];
       targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); });
       textResponses.push({ question: q.text, answers: texts });
     });
 
-    // 2. 📌 สำคัญ! ถ่ามีข้อที่เป็นตัวเลข (Radio) อย่างน้อย 1 ข้อ ค่อยวาดตารางและหัวตาราง
+    // ถ่ามีข้อที่เป็นตัวเลข ค่อยสร้างตาราง (ใส่ในกล่อง Accordion)
     if (radioQuestions.length > 0) {
-      html += `<h6 class="fw-bold text-success mt-4 mb-2"><i class="bi bi-bookmark-check"></i> ${cat}</h6>`;
-      html += `<div class="table-responsive mb-4"><table class="table table-bordered table-hover align-middle bg-white shadow-sm" style="font-size:0.9rem;">`;
-      html += `<thead class="table-light"><tr><th style="width:60%;">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead><tbody>`;
+      const collapseId = `collapse-cat-${catIndex}`; // ตั้งชื่อกล่อง
+      
+      html += `
+        <div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
+          <h2 class="accordion-header" id="heading-${collapseId}">
+            <button class="accordion-button bg-white fw-bold text-success border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
+              <i class="bi bi-bookmark-check-fill me-2"></i> ${cat}
+            </button>
+          </h2>
+          <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
+            <div class="accordion-body p-0">
+              <div class="table-responsive m-0">
+                <table class="table table-bordered table-hover align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;">
+                  <thead class="table-light"><tr><th style="width:60%;" class="ps-4">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead>
+                  <tbody>
+      `;
       
       radioQuestions.forEach(q => {
         let scores = [];
@@ -412,21 +430,39 @@ function renderEvaluationDetail() {
         }
         const interpret = (m) => { if(m >= 4.5) return 'มากที่สุด'; if(m >= 3.5) return 'มาก'; if(m >= 2.5) return 'ปานกลาง'; if(m >= 1.5) return 'น้อย'; return 'ปรับปรุง'; };
 
-        html += `<tr><td>${q.text}</td><td class="text-center fw-bold text-primary">${count > 0 ? mean.toFixed(2) : '-'}</td><td class="text-center text-muted">${count > 0 ? sd.toFixed(2) : '-'}</td><td class="text-center"><span class="badge ${mean >= 3.5 ? 'bg-success' : 'bg-warning text-dark'}">${count > 0 ? interpret(mean) : '-'}</span></td></tr>`;
+        html += `<tr><td class="ps-4">${q.text}</td><td class="text-center fw-bold text-primary">${count > 0 ? mean.toFixed(2) : '-'}</td><td class="text-center text-muted">${count > 0 ? sd.toFixed(2) : '-'}</td><td class="text-center"><span class="badge ${mean >= 3.5 ? 'bg-success' : 'bg-warning text-dark'}">${count > 0 ? interpret(mean) : '-'}</span></td></tr>`;
       });
-      html += `</tbody></table></div>`;
+      
+      html += `</tbody></table></div></div></div></div>`;
+      catIndex++;
     }
   });
+  
+  html += `</div>`; // ปิดกล่อง Accordion สำหรับตาราง
 
-  // วาดโซนข้อเขียนด้านล่างสุด
+  // 📌 โซนข้อเขียนด้านล่างสุด (จับยัดใส่กล่อง Accordion ด้วยเช่นกัน)
   if (textResponses.length > 0) {
      html += `<h6 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-chat-quote-fill"></i> ข้อเสนอแนะปลายเปิด (รายข้อ)</h6>`;
+     html += `<div class="accordion" id="textAccordion">`;
+     
      textResponses.forEach((tr, i) => {
-        html += `<div class="card border-0 shadow-sm mb-3"><div class="card-header bg-light fw-bold">${i+1}. ${tr.question}</div><ul class="list-group list-group-flush">`;
+        const collapseId = `collapse-text-${i}`;
+        html += `
+          <div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
+            <h2 class="accordion-header" id="heading-${collapseId}">
+              <button class="accordion-button bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
+                ${i+1}. ${tr.question}
+              </button>
+            </h2>
+            <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
+              <div class="accordion-body p-0">
+                <ul class="list-group list-group-flush">
+        `;
         if(tr.answers.length === 0) { html += `<li class="list-group-item text-muted text-center small py-3">- ไม่มีผู้ให้ข้อเสนอแนะ -</li>`; } 
-        else { tr.answers.forEach(ans => { html += `<li class="list-group-item small"><i class="bi bi-arrow-right-short text-success fs-5"></i> ${ans}</li>`; }); }
-        html += `</ul></div>`;
+        else { tr.answers.forEach(ans => { html += `<li class="list-group-item small px-4"><i class="bi bi-arrow-right-short text-success fs-5"></i> ${ans}</li>`; }); }
+        html += `</ul></div></div></div>`;
      });
+     html += `</div>`;
   }
   container.innerHTML = html;
 }
