@@ -330,7 +330,7 @@ function renderPaginatedTable() {
   paginatedItems.forEach(p => { 
     const att = p.attendance || {}; 
     const test = p.testScore || {}; 
-    const surv = p.survey || {};    
+    const surv = p.survey || { speakersEvaluated: [], project: false }; // 📌 ดึงข้อมูลประเมินมา
     let count = 0; 
     
     const checkSlot = (day, time) => {
@@ -348,13 +348,23 @@ function renderPaginatedTable() {
     const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
     const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
 
-    const evalSpeaker = surv.speaker ? '<span class="badge bg-success">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
-    const evalProject = surv.project ? '<span class="badge bg-success">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
+    // 📌 3. สร้างก้อน HTML สำหรับโชว์รายชื่อวิทยากร
+    let evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
+    if (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) {
+       evalSpeaker = `
+         <span class="badge bg-success mb-1 shadow-sm">ประเมินแล้ว (${surv.speakersEvaluated.length})</span><br>
+         <div class="text-start text-muted" style="font-size: 0.7rem; line-height: 1.2; min-width: 120px;">
+           ${surv.speakersEvaluated.map(name => `• ${name}`).join('<br>')}
+         </div>
+       `;
+    }
+
+    const evalProject = surv.project ? '<span class="badge bg-success shadow-sm">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
     tbody.innerHTML += `
       <tr>
         <td><code>${p.id}</code></td>
-        <td class="text-start">${p.name}</td>
+        <td class="text-start fw-bold">${p.name}</td>
         <td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
         <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
         <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
@@ -362,9 +372,8 @@ function renderPaginatedTable() {
         <td class="fw-bold bg-light border-start">${count}</td>
         <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
         <td>${preScore}</td>
-        <td>${evalSpeaker}</td>
-        <td>${postScore}</td>
-        <td>${evalProject}</td>
+        <td class="align-top">${evalSpeaker}</td> <td>${postScore}</td>
+        <td class="align-top">${evalProject}</td>
       </tr>
     `; 
   });
