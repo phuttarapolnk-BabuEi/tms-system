@@ -15,9 +15,9 @@ let filteredMentorData = [];
 let mentorChartInstance = null;  
 let mentorCurrentPage = 1;
 
-let globalEvalData = null; // เก็บข้อมูลประเมินทั้งหมด (Admin)
-let preChartInstance = null; // เก็บกราฟ Pre-Test
-let postChartInstance = null; // เก็บกราฟ Post-Test
+let globalEvalData = null; 
+let preChartInstance = null; 
+let postChartInstance = null; 
 
 // ==========================================
 // 📌 2. ฟังก์ชันหลัก (Core Functions)
@@ -210,7 +210,7 @@ async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJE
 
 function renderSurveyUI(surveyData, targetId, title) {
   if (!surveyData || surveyData.length === 0) {
-    return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ (โปรดตรวจดูชีต Questions_Bank ว่าพิมพ์ถูกไหม)', 'warning');
+    return Swal.fire('แจ้งเตือน', 'ยังไม่ได้เพิ่มข้อคำถามลงในระบบ', 'warning');
   }
 
   const groupedData = surveyData.reduce((acc, curr) => { if (!acc[curr.q_category]) acc[curr.q_category] = []; acc[curr.q_category].push(curr); return acc; }, {});
@@ -224,6 +224,12 @@ function renderSurveyUI(surveyData, targetId, title) {
       
       if (q.input_type === 'TEXT') {
         html += `<textarea class="form-control" name="${q.q_id}" rows="3" placeholder="พิมพ์ข้อเสนอแนะที่นี่..." required></textarea>`;
+      } else if (q.input_type === 'CHOICE') {
+        html += `<div class="d-flex flex-column gap-2 px-1 px-md-3">`;
+        q.options.forEach(opt => {
+          html += `<div class="form-check"><input class="form-check-input" type="radio" name="${q.q_id}" id="${q.q_id}_${opt}" value="${opt}" required><label class="form-check-label text-muted" style="cursor:pointer;" for="${q.q_id}_${opt}">${opt}</label></div>`;
+        });
+        html += `</div>`;
       } else {
         html += `<div class="d-flex justify-content-between px-1 px-md-4">`;
         [5, 4, 3, 2, 1].forEach(score => { html += `<div class="form-check text-center m-0 p-0"><input class="form-check-input float-none m-0" type="radio" name="${q.q_id}" value="${score}" required><label class="d-block small mt-1 text-muted">${score}</label></div>`; });
@@ -330,7 +336,7 @@ function renderPaginatedTable() {
   paginatedItems.forEach(p => { 
     const att = p.attendance || {}; 
     const test = p.testScore || {}; 
-    const surv = p.survey || { speakersEvaluated: [], project: false }; // 📌 ดึงข้อมูลประเมินมา
+    const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; 
     
     const checkSlot = (day, time) => {
@@ -348,7 +354,6 @@ function renderPaginatedTable() {
     const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
     const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
 
-    // 📌 3. สร้างก้อน HTML สำหรับโชว์รายชื่อวิทยากร
     let evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     if (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) {
        evalSpeaker = `
@@ -358,7 +363,6 @@ function renderPaginatedTable() {
          </div>
        `;
     }
-
     const evalProject = surv.project ? '<span class="badge bg-success shadow-sm">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
     tbody.innerHTML += `
@@ -372,7 +376,8 @@ function renderPaginatedTable() {
         <td class="fw-bold bg-light border-start">${count}</td>
         <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
         <td>${preScore}</td>
-        <td class="align-top">${evalSpeaker}</td> <td>${postScore}</td>
+        <td class="align-top">${evalSpeaker}</td> 
+        <td>${postScore}</td>
         <td class="align-top">${evalProject}</td>
       </tr>
     `; 
@@ -380,57 +385,6 @@ function renderPaginatedTable() {
   
   document.getElementById('pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredProgressData.length)} จากทั้งหมด ${filteredProgressData.length} รายการ`;
   renderPaginationControls(totalPages, 'admin');
-}
-
-// 📌 ฟังก์ชันใหม่: นำออกข้อมูลตาราง Matrix สรุปภาระงานเป็น Excel (CSV)
-function exportProgressTableToCSV() {
-  if (!filteredProgressData || filteredProgressData.length === 0) {
-    return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
-  }
-
-  // 1. สร้างหัวตาราง Excel
-  let csvContent = `"รหัส","ชื่อ-สกุล","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
-
-  // 2. วนลูปสกัดข้อมูลจากตารางมาแปลงเป็นตัวหนังสือ
-  filteredProgressData.forEach(p => {
-    const att = p.attendance || {};
-    const test = p.testScore || {};
-    const surv = p.survey || { speakersEvaluated: [], project: false };
-
-    let count = 0;
-    const checkSlot = (day, time) => {
-      if (att[day] && att[day][time]) { count++; return "มา"; }
-      return "ขาด";
-    };
-
-    const d1m = checkSlot('1', 'Morning');
-    const d1a = checkSlot('1', 'Afternoon');
-    const d1e = checkSlot('1', 'Evening');
-    const d2m = checkSlot('2', 'Morning');
-    const d2a = checkSlot('2', 'Afternoon');
-    const d2e = checkSlot('2', 'Evening');
-    const d3m = checkSlot('3', 'Morning');
-
-    const percentage = Math.round((count / 7) * 100);
-    
-    // ดึงคะแนนสอบ หรือแจ้งว่ารอสอบ
-    const preScore = test['PRE'] || "รอสอบ";
-    const postScore = test['POST'] || "รอสอบ";
-
-    // ดึงสถานะประเมิน
-    const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
-    const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
-
-    // 3. แพ็กข้อมูลของคนนี้ใส่แถวใหม่
-    csvContent += `"${p.id}","${p.name}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
-  });
-
-  // 4. สั่งสร้างไฟล์และดาวน์โหลด (ใช้ \uFEFF เพื่อให้ Excel อ่านภาษาไทยได้สมบูรณ์)
-  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `Matrix_Report_${new Date().getTime()}.csv`;
-  link.click();
 }
 
 function renderPaginationControls(totalPages, role = 'admin') {
@@ -444,8 +398,31 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
+function exportProgressTableToCSV() {
+  if (!filteredProgressData || filteredProgressData.length === 0) {
+    return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
+  }
+  let csvContent = `"รหัส","ชื่อ-สกุล","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
+
+  filteredProgressData.forEach(p => {
+    const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
+    let count = 0; const checkSlot = (day, time) => { if (att[day] && att[day][time]) { count++; return "มา"; } return "ขาด"; };
+    const d1m = checkSlot('1', 'Morning'); const d1a = checkSlot('1', 'Afternoon'); const d1e = checkSlot('1', 'Evening');
+    const d2m = checkSlot('2', 'Morning'); const d2a = checkSlot('2', 'Afternoon'); const d2e = checkSlot('2', 'Evening');
+    const d3m = checkSlot('3', 'Morning');
+    const percentage = Math.round((count / 7) * 100);
+    const preScore = test['PRE'] || "รอสอบ"; const postScore = test['POST'] || "รอสอบ";
+    const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
+    const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
+
+    csvContent += `"${p.id}","${p.name}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
+  });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Matrix_Report_${new Date().getTime()}.csv`; link.click();
+}
+
 // ----------------------------------------
-// 📌 Admin: สรุปผลคะแนนสอบ (Pre-Test / Post-Test) พร้อมกราฟ
+// 📌 Admin: สรุปผลคะแนนสอบ (Pre-Test / Post-Test)
 // ----------------------------------------
 function renderTestSummary(type) {
   if (!globalProgressData || globalProgressData.length === 0) return;
@@ -477,8 +454,7 @@ function renderTestSummary(type) {
   const mean = scores.reduce((a,b)=>a+b,0) / N;
   let sd = 0; if (N > 1) sd = Math.sqrt(scores.reduce((a,b)=>a+Math.pow(b-mean,2),0) / (N-1));
 
-  const themeColor = type === 'PRE' ? 'info' : 'success';
-  const textColor = type === 'PRE' ? 'dark' : 'white';
+  const themeColor = type === 'PRE' ? 'info' : 'success'; const textColor = type === 'PRE' ? 'dark' : 'white';
 
   container.innerHTML = `
     <div class="col-md-3"><div class="card bg-primary text-white border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">จำนวนผู้เข้าสอบ</h6><h2 class="mb-0 fw-bold">${N} <small class="fs-6 fw-normal">คน</small></h2></div></div></div>
@@ -487,28 +463,19 @@ function renderTestSummary(type) {
     <div class="col-md-3"><div class="card bg-dark text-white border-0 shadow-sm rounded-4 h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h6 class="fw-normal mb-2">ส่วนเบี่ยงเบน (S.D.)</h6><h2 class="mb-0 fw-bold">${sd.toFixed(2)}</h2></div></div></div>
   `;
 
-  let scoreCounts = {};
-  scores.forEach(s => { scoreCounts[s] = (scoreCounts[s] || 0) + 1; });
-  const labels = Object.keys(scoreCounts).sort((a,b)=>a-b); 
-  const data = labels.map(l => scoreCounts[l]);
-
-  const ctx = document.getElementById(canvasId);
-  const chartColor = type === 'PRE' ? '#0dcaf0' : '#198754'; 
+  let scoreCounts = {}; scores.forEach(s => { scoreCounts[s] = (scoreCounts[s] || 0) + 1; });
+  const labels = Object.keys(scoreCounts).sort((a,b)=>a-b); const data = labels.map(l => scoreCounts[l]);
+  const ctx = document.getElementById(canvasId); const chartColor = type === 'PRE' ? '#0dcaf0' : '#198754'; 
 
   if (type === 'PRE' && preChartInstance) preChartInstance.destroy();
   if (type === 'POST' && postChartInstance) postChartInstance.destroy();
 
-  const newChart = new Chart(ctx, {
-     type: 'bar',
-     data: { labels: labels.map(l => `ได้ ${l} คะแนน`), datasets: [{ label: 'จำนวนผู้สอบ (คน)', data: data, backgroundColor: chartColor, borderRadius: 6 }] },
-     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-  });
-
+  const newChart = new Chart(ctx, { type: 'bar', data: { labels: labels.map(l => `ได้ ${l} คะแนน`), datasets: [{ label: 'จำนวนผู้สอบ (คน)', data: data, backgroundColor: chartColor, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
   if (type === 'PRE') preChartInstance = newChart; else postChartInstance = newChart;
 }
 
 // ----------------------------------------
-// 📌 Admin: สรุปผลประเมิน (X̄ / S.D. / ข้อเขียน / Accordion)
+// 📌 Admin: สรุปผลประเมิน (Demographic / Rating / Text)
 // ----------------------------------------
 async function fetchEvaluationSummary() {
   const container = document.getElementById('eval-detail-container');
@@ -516,11 +483,9 @@ async function fetchEvaluationSummary() {
   const res = await callAPI('getEvaluationDashboardData');
   if (res.status === 'success') {
     globalEvalData = res;
-    const select = document.getElementById('eval-target-select');
-    select.innerHTML = '';
+    const select = document.getElementById('eval-target-select'); select.innerHTML = '';
     res.speakers.forEach(spk => { select.innerHTML += `<option value="${spk.id}">${spk.name}</option>`; });
-    if(res.speakers.length > 0) renderEvaluationDetail();
-    else container.innerHTML = '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตั้งค่าวิทยากร</div>';
+    if(res.speakers.length > 0) renderEvaluationDetail(); else container.innerHTML = '<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลการตั้งค่าวิทยากร</div>';
   } else { container.innerHTML = `<div class="text-danger text-center py-5">เกิดข้อผิดพลาด: ${res.message}</div>`; }
 }
 
@@ -546,69 +511,48 @@ function renderEvaluationDetail() {
   html += `<div class="accordion" id="evalAccordion">`;
   
   const categories = [...new Set(targetQuestions.map(q => q.category))];
-  let textResponses = []; 
-  let catIndex = 0; 
+  let textResponses = []; let catIndex = 0; 
 
   categories.forEach(cat => {
     const catQuestions = targetQuestions.filter(q => q.category === cat);
-    const radioQuestions = catQuestions.filter(q => q.inputType !== 'TEXT');
+    const ratingQuestions = catQuestions.filter(q => q.inputType === 'RATING');
+    const choiceQuestions = catQuestions.filter(q => q.inputType === 'CHOICE');
     const textQuestions = catQuestions.filter(q => q.inputType === 'TEXT');
     
-    textQuestions.forEach(q => {
-      let texts = [];
-      targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); });
-      textResponses.push({ question: q.text, answers: texts });
-    });
+    textQuestions.forEach(q => { let texts = []; targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') texts.push(ans.trim()); }); textResponses.push({ question: q.text, answers: texts }); });
 
-    if (radioQuestions.length > 0) {
-      const collapseId = `collapse-cat-${catIndex}`; 
-      html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
-                 <h2 class="accordion-header" id="heading-${collapseId}">
-                   <button class="accordion-button bg-white fw-bold text-success border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
-                     <i class="bi bi-bookmark-check-fill me-2"></i> ${cat}
-                   </button>
-                 </h2>
-                 <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
-                   <div class="accordion-body p-0">
-                     <div class="table-responsive m-0">
-                       <table class="table table-bordered table-hover align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;">
-                         <thead class="table-light"><tr><th style="width:60%;" class="ps-4">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead>
-                         <tbody>`;
-      
-      radioQuestions.forEach(q => {
-        let scores = [];
-        targetSurveys.forEach(s => { const val = parseFloat(s.answers[q.q_id]); if(!isNaN(val)) scores.push(val); });
-        
+    if (choiceQuestions.length > 0) {
+      const collapseId = `collapse-cat-choice-${catIndex}`; 
+      html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden"><h2 class="accordion-header" id="heading-${collapseId}"><button class="accordion-button bg-white fw-bold text-info border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}"><i class="bi bi-person-lines-fill me-2"></i> ${cat} (ข้อมูลพื้นฐาน)</button></h2><div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}"><div class="accordion-body p-0"><div class="table-responsive m-0"><table class="table table-bordered align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;"><thead class="table-light"><tr><th class="ps-4">รายการ</th><th class="text-center" style="width:15%">จำนวน (คน)</th><th class="text-center" style="width:15%">ร้อยละ (%)</th></tr></thead><tbody>`;
+      choiceQuestions.forEach(q => {
+        html += `<tr class="table-secondary"><td colspan="3" class="fw-bold ps-4 text-primary">${q.text}</td></tr>`;
+        let counts = {}; q.options.forEach(opt => counts[opt] = 0);
+        targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if (ans) counts[ans] = (counts[ans] || 0) + 1; });
+        q.options.forEach(opt => { const c = counts[opt] || 0; const pct = N > 0 ? ((c / N) * 100).toFixed(2) : 0; html += `<tr><td class="ps-5 text-muted"><i class="bi bi-caret-right-fill text-secondary" style="font-size:0.7rem;"></i> ${opt}</td><td class="text-center fw-bold">${c}</td><td class="text-center">${pct}%</td></tr>`; });
+      });
+      html += `</tbody></table></div></div></div></div>`; catIndex++;
+    }
+
+    if (ratingQuestions.length > 0) {
+      const collapseId = `collapse-cat-rating-${catIndex}`; 
+      html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden"><h2 class="accordion-header" id="heading-${collapseId}"><button class="accordion-button bg-white fw-bold text-success border-bottom" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}"><i class="bi bi-bookmark-check-fill me-2"></i> ${cat} (ระดับความพึงพอใจ)</button></h2><div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}"><div class="accordion-body p-0"><div class="table-responsive m-0"><table class="table table-bordered table-hover align-middle bg-white m-0" style="font-size:0.9rem; border-top: 0;"><thead class="table-light"><tr><th style="width:60%;" class="ps-4">รายการประเมิน</th><th class="text-center">X̄</th><th class="text-center">S.D.</th><th class="text-center">แปลผล</th></tr></thead><tbody>`;
+      ratingQuestions.forEach(q => {
+        let scores = []; targetSurveys.forEach(s => { const val = parseFloat(s.answers[q.q_id]); if(!isNaN(val)) scores.push(val); });
         let mean = 0, sd = 0; const count = scores.length;
-        if(count > 0) {
-          mean = scores.reduce((a,b)=>a+b, 0) / count;
-          let variance = 0; if(count > 1) variance = scores.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / (count-1);
-          sd = Math.sqrt(variance);
-        }
+        if(count > 0) { mean = scores.reduce((a,b)=>a+b, 0) / count; let variance = 0; if(count > 1) variance = scores.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / (count-1); sd = Math.sqrt(variance); }
         const interpret = (m) => { if(m >= 4.5) return 'มากที่สุด'; if(m >= 3.5) return 'มาก'; if(m >= 2.5) return 'ปานกลาง'; if(m >= 1.5) return 'น้อย'; return 'ปรับปรุง'; };
-
         html += `<tr><td class="ps-4">${q.text}</td><td class="text-center fw-bold text-primary">${count > 0 ? mean.toFixed(2) : '-'}</td><td class="text-center text-muted">${count > 0 ? sd.toFixed(2) : '-'}</td><td class="text-center"><span class="badge ${mean >= 3.5 ? 'bg-success' : 'bg-warning text-dark'}">${count > 0 ? interpret(mean) : '-'}</span></td></tr>`;
       });
-      html += `</tbody></table></div></div></div></div>`;
-      catIndex++;
+      html += `</tbody></table></div></div></div></div>`; catIndex++;
     }
   });
   html += `</div>`; 
 
   if (textResponses.length > 0) {
-     html += `<h6 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-chat-quote-fill"></i> ข้อเสนอแนะปลายเปิด (รายข้อ)</h6>`;
-     html += `<div class="accordion" id="textAccordion">`;
+     html += `<h6 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-chat-quote-fill"></i> ข้อเสนอแนะปลายเปิด (รายข้อ)</h6><div class="accordion" id="textAccordion">`;
      textResponses.forEach((tr, i) => {
         const collapseId = `collapse-text-${i}`;
-        html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
-                   <h2 class="accordion-header" id="heading-${collapseId}">
-                     <button class="accordion-button bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">
-                       ${i+1}. ${tr.question}
-                     </button>
-                   </h2>
-                   <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}">
-                     <div class="accordion-body p-0">
-                       <ul class="list-group list-group-flush">`;
+        html += `<div class="accordion-item border-0 shadow-sm rounded-4 mb-3 overflow-hidden"><h2 class="accordion-header" id="heading-${collapseId}"><button class="accordion-button bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true" aria-controls="${collapseId}">${i+1}. ${tr.question}</button></h2><div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="heading-${collapseId}"><div class="accordion-body p-0"><ul class="list-group list-group-flush">`;
         if(tr.answers.length === 0) { html += `<li class="list-group-item text-muted text-center small py-3">- ไม่มีผู้ให้ข้อเสนอแนะ -</li>`; } 
         else { tr.answers.forEach(ans => { html += `<li class="list-group-item small px-4"><i class="bi bi-arrow-right-short text-success fs-5"></i> ${ans}</li>`; }); }
         html += `</ul></div></div></div>`;
@@ -623,17 +567,13 @@ function exportEvaluationToCSV() {
   const selectObj = document.getElementById('eval-target-select'); const targetName = selectObj.options[selectObj.selectedIndex].text;
   if(!targetId || !globalEvalData) return;
 
-  const { questions, surveys } = globalEvalData;
-  const targetSurveys = surveys.filter(s => s.targetId === targetId);
+  const { questions, surveys } = globalEvalData; const targetSurveys = surveys.filter(s => s.targetId === targetId);
   const expectedQType = targetId === 'PROJECT' ? 'PROJECT_SURVEY' : 'SPEAKER_SURVEY';
-  
-  let targetQuestions = [];
-  for (let qId in questions) { if (questions[qId].type === expectedQType) targetQuestions.push({ q_id: qId, ...questions[qId] }); }
+  let targetQuestions = []; for (let qId in questions) { if (questions[qId].type === expectedQType) targetQuestions.push({ q_id: qId, ...questions[qId] }); }
 
-  let csvContent = `"รายงานผลการประเมิน: ${targetName}"\n`; csvContent += `"จำนวนผู้ประเมิน: ${targetSurveys.length} คน"\n\n`;
-  csvContent += `"ตอนที่ 1: การประเมินระดับความพึงพอใจ"\n`; csvContent += `"หมวดหมู่","รายการประเมิน","N","Mean","S.D.","แปลผล"\n`;
+  let csvContent = `"รายงานผลการประเมิน: ${targetName}"\n"จำนวนผู้ประเมิน: ${targetSurveys.length} คน"\n\n"ตอนที่ 1: การประเมินระดับความพึงพอใจ"\n"หมวดหมู่","รายการประเมิน","N","Mean","S.D.","แปลผล"\n`;
 
-  targetQuestions.filter(q => q.inputType !== 'TEXT').forEach(q => {
+  targetQuestions.filter(q => q.inputType === 'RATING').forEach(q => {
      let scores = []; targetSurveys.forEach(s => { const val = parseFloat(s.answers[q.q_id]); if(!isNaN(val)) scores.push(val); });
      const count = scores.length; let mean = 0, sd = 0;
      if(count > 0) { mean = scores.reduce((a,b)=>a+b, 0) / count; if(count > 1) sd = Math.sqrt(scores.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / (count-1)); }
