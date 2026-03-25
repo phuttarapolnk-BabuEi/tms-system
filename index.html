@@ -34,7 +34,7 @@
           <h4 class="mb-4 fw-bold">ลงชื่อเข้าใช้งานระบบ</h4>
           <div class="input-group mb-4 shadow-sm">
             <span class="input-group-text bg-white"><i class="bi bi-credit-card-2-front"></i></span>
-            <input type="text" id="input-personal-id" class="form-control border-start-0 pl-0" placeholder="เลขประจำตัวผู้อบรม" onkeypress="if(event.key === 'Enter') handleLogin()">
+            <input type="text" id="input-personal-id" class="form-control border-start-0 pl-0" placeholder="เลขประจำตัวประชาชน" onkeypress="if(event.key === 'Enter') handleLogin()">
           </div>
           <button class="btn btn-primary w-100 py-2 rounded-pill fw-bold shadow-sm" onclick="handleLogin()">เข้าสู่ระบบ</button>
         </div>
@@ -44,7 +44,6 @@
     <div id="trainee-view" class="app-view">
       <h4 class="mb-4 text-secondary"><i class="bi bi-person-badge"></i> พื้นที่สำหรับผู้เข้าอบรม</h4>
       <div class="row g-4">
-        
         <div class="col-md-6">
           <div class="card shadow-sm border-0 border-top border-success border-4 h-100">
             <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
@@ -57,7 +56,6 @@
             </div>
           </div>
         </div>
-        
         <div class="col-md-6">
           <div class="card shadow-sm border-0 border-top border-info border-4 h-100">
             <div class="card-header bg-white fw-bold"><i class="bi bi-ui-checks"></i> ภาระงานและแบบประเมิน</div>
@@ -70,7 +68,6 @@
             </div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -119,7 +116,7 @@
       
       <ul class="nav nav-pills mb-4 bg-white p-2 rounded-pill shadow-sm" id="adminTabs" role="tablist">
         <li class="nav-item"><a class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#stats">📊 สถิติภาพรวม</a></li>
-        <li class="nav-item" id="nav-crud-menu"><a class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#crud">⚙️ จัดการข้อมูล (Admin)</a></li>
+        <li class="nav-item d-none" id="nav-crud-menu"><a class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#crud">⚙️ จัดการข้อมูล (Admin)</a></li>
       </ul>
       
       <div class="tab-content">
@@ -140,10 +137,11 @@
                   <span class="fw-bold text-success"><i class="bi bi-list-check"></i> ตารางสรุปภาระงาน</span>
                   <div class="d-flex gap-2 w-auto">
                     <select id="filter-group-target" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterProgressTable()">
-                      <option value="ALL">ทุกกลุ่มเป้าหมาย</option><option value="1">กลุ่ม 1</option><option value="2">กลุ่ม 2</option><option value="3">กลุ่ม 3</option><option value="4">กลุ่ม 4</option>
-                      <option value="5">กลุ่ม 5</option><option value="6">กลุ่ม 6</option><option value="7">กลุ่ม 7</option><option value="8">กลุ่ม 8</option><option value="9">กลุ่ม 9</option>
-                      <option value="10">กลุ่ม 10</option><option value="11">กลุ่ม 11</option><option value="12">กลุ่ม 12</option><option value="13">กลุ่ม 13</option><option value="14">กลุ่ม 14</option>
-                      <option value="15">กลุ่ม 15</option><option value="16">กลุ่ม 16</option><option value="17">กลุ่ม 17</option><option value="18">กลุ่ม 18</option><option value="ส่วนกลาง">กลุ่ม ส่วนกลาง</option>
+                      <option value="ALL">ทุกกลุ่มเป้าหมาย</option><option value="1">กลุ่ม 1</option><option value="2">กลุ่ม 2</option><option value="3">กลุ่ม 3</option>
+                      <option value="4">กลุ่ม 4</option><option value="5">กลุ่ม 5</option><option value="6">กลุ่ม 6</option><option value="7">กลุ่ม 7</option>
+                      <option value="8">กลุ่ม 8</option><option value="9">กลุ่ม 9</option><option value="10">กลุ่ม 10</option><option value="11">กลุ่ม 11</option>
+                      <option value="12">กลุ่ม 12</option><option value="13">กลุ่ม 13</option><option value="14">กลุ่ม 14</option><option value="15">กลุ่ม 15</option>
+                      <option value="16">กลุ่ม 16</option><option value="17">กลุ่ม 17</option><option value="18">กลุ่ม 18</option><option value="ส่วนกลาง">กลุ่ม ส่วนกลาง</option>
                     </select>
                     <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden w-auto" style="max-width: 200px;">
                       <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
@@ -151,9 +149,6 @@
                     </div>
                     
                     <button class="btn btn-sm btn-success rounded-pill shadow-sm fw-bold px-3" onclick="exportProgressTableToCSV()"><i class="bi bi-file-earmark-excel"></i> นำออกข้อมูล</button>
-                    
-                    <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchProgressData()"><i class="bi bi-arrow-clockwise"></i></button>
-                  </div>
                     <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchProgressData()"><i class="bi bi-arrow-clockwise"></i></button>
                   </div>
                 </div>
@@ -310,6 +305,6 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <script src="script.js?v=46"></script> 
+  <script src="script.js?v=47"></script> 
 </body>
 </html>
