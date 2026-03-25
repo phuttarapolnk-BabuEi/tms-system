@@ -149,6 +149,11 @@
                       <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
                       <input type="text" id="search-progress" class="form-control border-start-0" placeholder="ค้นหาชื่อ, รหัส..." onkeyup="filterProgressTable()">
                     </div>
+                    
+                    <button class="btn btn-sm btn-success rounded-pill shadow-sm fw-bold px-3" onclick="exportProgressTableToCSV()"><i class="bi bi-file-earmark-excel"></i> นำออกข้อมูล</button>
+                    
+                    <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchProgressData()"><i class="bi bi-arrow-clockwise"></i></button>
+                  </div>
                     <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchProgressData()"><i class="bi bi-arrow-clockwise"></i></button>
                   </div>
                 </div>
@@ -305,6 +310,6 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <script src="script.js?v=45"></script> 
+  <script src="script.js?v=46"></script> 
 </body>
 </html>

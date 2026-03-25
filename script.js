@@ -382,6 +382,57 @@ function renderPaginatedTable() {
   renderPaginationControls(totalPages, 'admin');
 }
 
+// 📌 ฟังก์ชันใหม่: นำออกข้อมูลตาราง Matrix สรุปภาระงานเป็น Excel (CSV)
+function exportProgressTableToCSV() {
+  if (!filteredProgressData || filteredProgressData.length === 0) {
+    return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
+  }
+
+  // 1. สร้างหัวตาราง Excel
+  let csvContent = `"รหัส","ชื่อ-สกุล","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
+
+  // 2. วนลูปสกัดข้อมูลจากตารางมาแปลงเป็นตัวหนังสือ
+  filteredProgressData.forEach(p => {
+    const att = p.attendance || {};
+    const test = p.testScore || {};
+    const surv = p.survey || { speakersEvaluated: [], project: false };
+
+    let count = 0;
+    const checkSlot = (day, time) => {
+      if (att[day] && att[day][time]) { count++; return "มา"; }
+      return "ขาด";
+    };
+
+    const d1m = checkSlot('1', 'Morning');
+    const d1a = checkSlot('1', 'Afternoon');
+    const d1e = checkSlot('1', 'Evening');
+    const d2m = checkSlot('2', 'Morning');
+    const d2a = checkSlot('2', 'Afternoon');
+    const d2e = checkSlot('2', 'Evening');
+    const d3m = checkSlot('3', 'Morning');
+
+    const percentage = Math.round((count / 7) * 100);
+    
+    // ดึงคะแนนสอบ หรือแจ้งว่ารอสอบ
+    const preScore = test['PRE'] || "รอสอบ";
+    const postScore = test['POST'] || "รอสอบ";
+
+    // ดึงสถานะประเมิน
+    const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
+    const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
+
+    // 3. แพ็กข้อมูลของคนนี้ใส่แถวใหม่
+    csvContent += `"${p.id}","${p.name}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
+  });
+
+  // 4. สั่งสร้างไฟล์และดาวน์โหลด (ใช้ \uFEFF เพื่อให้ Excel อ่านภาษาไทยได้สมบูรณ์)
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `Matrix_Report_${new Date().getTime()}.csv`;
+  link.click();
+}
+
 function renderPaginationControls(totalPages, role = 'admin') {
   const ul = document.getElementById(role === 'admin' ? 'pagination-controls' : 'mentor-pagination-controls');
   const current = role === 'admin' ? currentPage : mentorCurrentPage;
