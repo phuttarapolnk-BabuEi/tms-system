@@ -288,10 +288,33 @@ function renderSurveyUI(surveyData, targetId, title) {
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
+  
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
-  if (res.status === 'success') { globalMentorData = res.data; renderMentorChart(); filterMentorTable(); } 
-  else { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; }
+  
+  if (res.status === 'success') { 
+    globalMentorData = res.data; 
+    
+    // 📌 สร้างตัวเลือก "วันที่" ใน Dropdown แบบอัตโนมัติ
+    const dayFilter = document.getElementById('mentor-filter-day');
+    const currentVal = dayFilter.value; // จำค่าเดิมที่เลือกไว้
+    dayFilter.innerHTML = '<option value="ALL">ทุกวัน</option>';
+    
+    if (res.schedule && res.schedule.length > 0) {
+      res.schedule.forEach(d => {
+        const thDate = formatThaiDate(d.date);
+        dayFilter.innerHTML += `<option value="${d.dayNo}">วันที่ ${d.dayNo} (${thDate})</option>`;
+      });
+    }
+    dayFilter.value = currentVal || 'ALL'; // คืนค่าที่เลือก
+    
+    renderMentorChart(); 
+    filterMentorTable(); 
+  } 
+  else { 
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+  }
 }
+
 function renderMentorChart() { 
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
   globalMentorData.forEach(log => { if(counts[log.time_slot] !== undefined) counts[log.time_slot]++; });
