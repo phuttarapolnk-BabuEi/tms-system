@@ -55,6 +55,13 @@ function setupDashboard() {
   const safeRole = currentUser.role ? currentUser.role.toString().trim().toUpperCase() : 'TRAINEE';
   document.getElementById('display-user-name').innerText = currentUser.name;
   document.getElementById('display-user-role').innerText = safeRole;
+  
+  // 📌 แสดงผล Area_Service ถ้ามีข้อมูล
+  const areaElem = document.getElementById('display-user-area');
+  if (areaElem) {
+      areaElem.innerText = currentUser.area_service || '';
+  }
+
   document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
   
   if (safeRole === 'ADMIN' || safeRole === 'STAFF') {
@@ -320,7 +327,8 @@ function renderPaginatedTable() {
   tbody.innerHTML = '';
   
   if (filteredProgressData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="16" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
+    // 📌 ขยาย colspan เป็น 17 เพราะมีคอลัมน์คลัสเตอร์โผล่มา
+    tbody.innerHTML = '<tr><td colspan="17" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
     document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
     document.getElementById('pagination-controls').innerHTML = '';
     return;
@@ -365,10 +373,12 @@ function renderPaginatedTable() {
     }
     const evalProject = surv.project ? '<span class="badge bg-success shadow-sm">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
+    // 📌 ยัด p.cluster ลงไปในตาราง
     tbody.innerHTML += `
       <tr>
         <td><code>${p.id}</code></td>
         <td class="text-start fw-bold">${p.name}</td>
+        <td>${p.cluster || '-'}</td>
         <td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
         <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
         <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
@@ -398,11 +408,12 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
+// 📌 อัปเดตฟังก์ชันดาวน์โหลด Excel ให้มีคอลัมน์คลัสเตอร์
 function exportProgressTableToCSV() {
   if (!filteredProgressData || filteredProgressData.length === 0) {
     return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
   }
-  let csvContent = `"รหัส","ชื่อ-สกุล","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
+  let csvContent = `"รหัส","ชื่อ-สกุล","คลัสเตอร์","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
 
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
@@ -415,7 +426,7 @@ function exportProgressTableToCSV() {
     const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
     const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
 
-    csvContent += `"${p.id}","${p.name}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
+    csvContent += `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
   });
   const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Matrix_Report_${new Date().getTime()}.csv`; link.click();
