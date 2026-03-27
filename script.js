@@ -3,6 +3,7 @@
 // ==========================================
 const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
 
+
 let currentUser = null;          
 let globalProgressData = [];     
 let filteredProgressData = [];   
@@ -18,6 +19,7 @@ let mentorCurrentPage = 1;
 let globalEvalData = null; 
 let preChartInstance = null; 
 let postChartInstance = null; 
+let globalSchedule = []; // 📌 เก็บโครงสร้างตารางเวลาอัจฉริยะ
 
 // ==========================================
 // 📌 2. ฟังก์ชันหลัก (Core Functions)
@@ -31,6 +33,24 @@ async function callAPI(action, payload = {}) {
     });
     return await response.json();
   } catch (error) { throw new Error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+}
+
+// 📌 ฟังก์ชันแปลงวันที่ YYYY-MM-DD เป็น 30 มี.ค. 69 แบบฉลาด
+function formatThaiDate(dateStr) {
+   if(!dateStr) return '';
+   let d = new Date(dateStr);
+   if(isNaN(d.getTime())) {
+      const parts = dateStr.split(/[-/]/);
+      if(parts.length === 3) {
+         if(parts[2].length === 4) d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // DD/MM/YYYY
+         else d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`); // YYYY-MM-DD
+      }
+   }
+   if(isNaN(d.getTime())) return dateStr;
+   
+   const y = d.getFullYear() < 2500 ? d.getFullYear() + 543 : d.getFullYear();
+   const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+   return `${d.getDate()} ${months[d.getMonth()]} ${y.toString().slice(-2)}`;
 }
 
 async function handleLogin() {
@@ -56,11 +76,8 @@ function setupDashboard() {
   document.getElementById('display-user-name').innerText = currentUser.name;
   document.getElementById('display-user-role').innerText = safeRole;
   
-  // 📌 แสดงผล Area_Service ถ้ามีข้อมูล
   const areaElem = document.getElementById('display-user-area');
-  if (areaElem) {
-      areaElem.innerText = currentUser.area_service || '';
-  }
+  if (areaElem) areaElem.innerText = currentUser.area_service || '';
 
   document.querySelectorAll('.app-view').forEach(el => el.classList.remove('d-block'));
   
@@ -309,7 +326,11 @@ function startRealtimeDashboard() {
 
 async function fetchProgressData() {
   const res = await callAPI('getTraineeProgress'); 
-  if (res.status === 'success') { globalProgressData = res.data; filterProgressTable(); }
+  if (res.status === 'success') { 
+    globalProgressData = res.data; 
+    globalSchedule = res.schedule || []; 
+    filterProgressTable(); 
+  }
 }
 
 function filterProgressTable() {
@@ -322,75 +343,96 @@ function filterProgressTable() {
   currentPage = 1; renderPaginatedTable();
 }
 
+// 📌 1. วาดหัวตารางแบบอัจฉริยะ ดึงวันที่จากหลังบ้านมาสร้าง
 function renderPaginatedTable() {
+  const thead = document.querySelector('#progress-table-body').closest('table').querySelector('thead');
   const tbody = document.getElementById('progress-table-body');
-  tbody.innerHTML = '';
   
+  let totalSlots = 0;
+  let topRow = `<tr>
+                 <th rowspan="2" class="align-middle">รหัส</th>
+                 <th rowspan="2" class="align-middle">ชื่อ-สกุล</th>
+                 <th rowspan="2" class="align-middle">คลัสเตอร์</th>
+                 <th rowspan="2" class="align-middle">กลุ่ม</th>`;
+  let bottomRow = `<tr>`;
+
+  if (globalSchedule && globalSchedule.length > 0) {
+    globalSchedule.forEach(day => {
+       const slotsCount = day.slots.length;
+       totalSlots += slotsCount;
+       const thDate = formatThaiDate(day.date);
+       topRow += `<th colspan="${slotsCount}" class="align-middle">วันที่ ${day.dayNo} <br><small class="fw-normal">(${thDate})</small></th>`;
+       
+       day.slots.forEach(slot => {
+          let slotName = slot.id === 'Morning' ? 'เช้า' : slot.id === 'Afternoon' ? 'บ่าย' : slot.id === 'Evening' ? 'เย็น' : slot.id === 'Checkout' ? 'สะท้อนผล' : slot.label;
+          bottomRow += `<th class="fw-normal border-top" style="background-color: rgba(255,255,255,0.15);">${slotName}</th>`;
+       });
+    });
+  } else {
+     totalSlots = 1; topRow += `<th colspan="1">ข้อมูลตารางเวลา</th>`; bottomRow += `<th>-</th>`;
+  }
+
+  topRow += `<th rowspan="2" class="align-middle border-start" style="background-color: rgba(0,0,0,0.05);">รวม<br>(ครั้ง)</th>
+             <th rowspan="2" class="align-middle border-end" style="background-color: rgba(0,0,0,0.05);">ร้อยละ<br>(%)</th>
+             <th rowspan="2" class="align-middle bg-info text-dark border-start">Pre-Test</th>
+             <th rowspan="2" class="align-middle bg-success text-white">ประเมิน<br>วิทยากร</th>
+             <th rowspan="2" class="align-middle bg-info text-dark">Post-Test</th>
+             <th rowspan="2" class="align-middle bg-success text-white">ความพึงพอใจ<br>โครงการ</th></tr>`;
+  bottomRow += `</tr>`;
+  
+  thead.innerHTML = topRow + bottomRow;
+
+  // 📌 2. วาดข้อมูลแถวผู้เข้าอบรม
+  tbody.innerHTML = '';
   if (filteredProgressData.length === 0) {
-    // 📌 ขยาย colspan เป็น 17 เพราะมีคอลัมน์คลัสเตอร์โผล่มา
-    tbody.innerHTML = '<tr><td colspan="17" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>';
-    document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล';
-    document.getElementById('pagination-controls').innerHTML = '';
-    return;
+    tbody.innerHTML = `<tr><td colspan="${6 + totalSlots}" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>`;
+    document.getElementById('pagination-info').innerText = 'ไม่พบข้อมูล'; document.getElementById('pagination-controls').innerHTML = ''; return;
   }
   
   const totalPages = Math.ceil(filteredProgressData.length / rowsPerPage);
   const startIdx = (currentPage - 1) * rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
 
-  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>';
-  const crossMark = '<span class="text-muted opacity-25">-</span>';
+  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>'; const crossMark = '<span class="text-muted opacity-25">-</span>';
 
   paginatedItems.forEach(p => { 
-    const att = p.attendance || {}; 
-    const test = p.testScore || {}; 
-    const surv = p.survey || { speakersEvaluated: [], project: false };
-    let count = 0; 
+    const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
+    let count = 0; let attendanceHtml = '';
     
-    const checkSlot = (day, time) => {
-      if (att[day] && att[day][time]) { count++; return checkMark; }
-      return crossMark;
-    };
-    
-    const d1m = checkSlot('1', 'Morning'); const d1a = checkSlot('1', 'Afternoon'); const d1e = checkSlot('1', 'Evening');
-    const d2m = checkSlot('2', 'Morning'); const d2a = checkSlot('2', 'Afternoon'); const d2e = checkSlot('2', 'Evening');
-    const d3m = checkSlot('3', 'Morning');
+    if (globalSchedule && globalSchedule.length > 0) {
+      globalSchedule.forEach(day => {
+        day.slots.forEach((slot, index) => {
+           let isEnd = (index === day.slots.length - 1) ? 'class="border-end"' : '';
+           if (att[day.dayNo] && att[day.dayNo][slot.id]) { count++; attendanceHtml += `<td ${isEnd}>${checkMark}</td>`; } 
+           else { attendanceHtml += `<td ${isEnd}>${crossMark}</td>`; }
+        });
+      });
+    }
 
-    const percentage = Math.round((count / 7) * 100);
+    const percentage = totalSlots > 0 ? Math.round((count / totalSlots) * 100) : 0;
     const badgeColor = percentage >= 80 ? 'bg-success' : (percentage >= 50 ? 'bg-warning text-dark' : 'bg-danger');
-
     const preScore = test['PRE'] ? `<span class="badge bg-info text-dark fs-6">${test['PRE']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
     const postScore = test['POST'] ? `<span class="badge bg-info text-dark fs-6">${test['POST']}</span>` : `<span class="badge bg-light text-muted border">รอสอบ</span>`;
 
     let evalSpeaker = '<span class="badge bg-light text-muted border">รอประเมิน</span>';
     if (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) {
-       evalSpeaker = `
-         <span class="badge bg-success mb-1 shadow-sm">ประเมินแล้ว (${surv.speakersEvaluated.length})</span><br>
-         <div class="text-start text-muted" style="font-size: 0.7rem; line-height: 1.2; min-width: 120px;">
-           ${surv.speakersEvaluated.map(name => `• ${name}`).join('<br>')}
-         </div>
-       `;
+       evalSpeaker = `<span class="badge bg-success mb-1 shadow-sm">ประเมินแล้ว (${surv.speakersEvaluated.length})</span><br><div class="text-start text-muted" style="font-size: 0.7rem; line-height: 1.2; min-width: 120px;">${surv.speakersEvaluated.map(name => `• ${name}`).join('<br>')}</div>`;
     }
     const evalProject = surv.project ? '<span class="badge bg-success shadow-sm">ประเมินแล้ว <i class="bi bi-check-circle-fill"></i></span>' : '<span class="badge bg-light text-muted border">รอประเมิน</span>';
 
-    // 📌 ยัด p.cluster ลงไปในตาราง
-    tbody.innerHTML += `
-      <tr>
+    tbody.innerHTML += `<tr>
         <td><code>${p.id}</code></td>
         <td class="text-start fw-bold">${p.name}</td>
         <td>${p.cluster || '-'}</td>
         <td><span class="badge bg-light text-dark border">กลุ่ม ${p.group}</span></td>
-        <td>${d1m}</td><td>${d1a}</td><td class="border-end">${d1e}</td>
-        <td>${d2m}</td><td>${d2a}</td><td class="border-end">${d2e}</td>
-        <td class="border-end">${d3m}</td>
+        ${attendanceHtml}
         <td class="fw-bold bg-light border-start">${count}</td>
         <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
         <td>${preScore}</td>
         <td class="align-top">${evalSpeaker}</td> 
         <td>${postScore}</td>
         <td class="align-top">${evalProject}</td>
-      </tr>
-    `; 
+      </tr>`; 
   });
   
   document.getElementById('pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredProgressData.length)} จากทั้งหมด ${filteredProgressData.length} รายการ`;
@@ -408,26 +450,44 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
-// 📌 อัปเดตฟังก์ชันดาวน์โหลด Excel ให้มีคอลัมน์คลัสเตอร์
+// 📌 อัปเดตฟังก์ชันดาวน์โหลด Excel แบบอัจฉริยะ โหลดหัวตารางให้ตรงกับในหน้าเว็บ
 function exportProgressTableToCSV() {
-  if (!filteredProgressData || filteredProgressData.length === 0) {
-    return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
+  if (!filteredProgressData || filteredProgressData.length === 0) return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
+  
+  let csvHeader = `"รหัส","ชื่อ-สกุล","คลัสเตอร์","กลุ่ม",`; let totalSlots = 0;
+  if (globalSchedule && globalSchedule.length > 0) {
+    globalSchedule.forEach(day => {
+      const thDate = formatThaiDate(day.date);
+      day.slots.forEach(slot => {
+        totalSlots++;
+        let slotName = slot.id === 'Morning' ? 'เช้า' : slot.id === 'Afternoon' ? 'บ่าย' : slot.id === 'Evening' ? 'เย็น' : slot.id === 'Checkout' ? 'สะท้อนผล' : slot.label;
+        csvHeader += `"${thDate} (${slotName})",`;
+      });
+    });
   }
-  let csvContent = `"รหัส","ชื่อ-สกุล","คลัสเตอร์","กลุ่ม","วันที่ 1 (เช้า)","วันที่ 1 (บ่าย)","วันที่ 1 (เย็น)","วันที่ 2 (เช้า)","วันที่ 2 (บ่าย)","วันที่ 2 (เย็น)","วันที่ 3 (เช้า)","รวมมา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจ"\n`;
+  csvHeader += `"รวมเวลา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
+  let csvContent = csvHeader;
 
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
-    let count = 0; const checkSlot = (day, time) => { if (att[day] && att[day][time]) { count++; return "มา"; } return "ขาด"; };
-    const d1m = checkSlot('1', 'Morning'); const d1a = checkSlot('1', 'Afternoon'); const d1e = checkSlot('1', 'Evening');
-    const d2m = checkSlot('2', 'Morning'); const d2a = checkSlot('2', 'Afternoon'); const d2e = checkSlot('2', 'Evening');
-    const d3m = checkSlot('3', 'Morning');
-    const percentage = Math.round((count / 7) * 100);
+    let count = 0; let rowCsv = `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}",`;
+    
+    if (globalSchedule && globalSchedule.length > 0) {
+      globalSchedule.forEach(day => {
+        day.slots.forEach(slot => {
+          if (att[day.dayNo] && att[day.dayNo][slot.id]) { count++; rowCsv += `"มา",`; } else { rowCsv += `"ขาด",`; }
+        });
+      });
+    }
+
+    const percentage = totalSlots > 0 ? Math.round((count / totalSlots) * 100) : 0;
     const preScore = test['PRE'] || "รอสอบ"; const postScore = test['POST'] || "รอสอบ";
     const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
     const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
 
-    csvContent += `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}","${d1m}","${d1a}","${d1e}","${d2m}","${d2a}","${d2e}","${d3m}","${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
+    csvContent += rowCsv + `"${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
   });
+  
   const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Matrix_Report_${new Date().getTime()}.csv`; link.click();
 }
