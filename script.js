@@ -403,24 +403,42 @@ function filterMentorTable() {
   filteredMentorData = globalMentorData.filter(log => { return (log.name.toLowerCase().includes(keyword) || log.personal_id.toString().includes(keyword)) && (filterDay === 'ALL' || log.day_no.toString() === filterDay) && (filterTime === 'ALL' || log.time_slot === filterTime); });
   mentorCurrentPage = 1; renderMentorPaginatedTable();
 }
+
 function renderMentorPaginatedTable() {
   const tbody = document.getElementById('mentor-table-body'); 
   if(!tbody) return;
   tbody.innerHTML = '';
-  if (filteredMentorData.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'; return; }
+  
+  // 📌 เปลี่ยน colspan เป็น 6 เพราะมีคอลัมน์หมายเหตุเพิ่มมา
+  if (filteredMentorData.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'; return; }
+  
   const startIdx = (mentorCurrentPage - 1) * rowsPerPage; const paginatedItems = filteredMentorData.slice(startIdx, startIdx + rowsPerPage);
   const timeTranslates = { 'Morning': 'เช้า', 'Afternoon': 'บ่าย', 'Evening': 'เย็น', 'Checkout': 'สะท้อนผล' };
   
-  // 📌 จุดอัปเดต: ถ้าเจอคำว่า [สาย] ให้แปะป้ายแจ้ง Mentor
   paginatedItems.forEach(log => { 
      const isLate = log.note && log.note.includes('[สาย]');
      const lateBadge = isLate ? `<span class="badge bg-warning text-dark ms-2">สาย</span>` : '';
-     tbody.innerHTML += `<tr><td class="ps-3"><code>${log.personal_id}</code></td><td class="text-start">${log.name}</td><td>วันที่ ${log.day_no}</td><td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span>${lateBadge}</td><td class="small text-muted">${log.timestamp}</td></tr>`; 
+     
+     // 📌 ตัดคำว่า [สาย] ออกจากข้อความหมายเหตุเวลาแสดงผล จะได้ดูเนียนๆ ครับ
+     let displayNote = log.note ? log.note.replace('[สาย]', '').trim() : '-';
+     if (displayNote === '') displayNote = '-';
+
+     tbody.innerHTML += `
+       <tr>
+         <td class="ps-3"><code>${log.personal_id}</code></td>
+         <td class="text-start">${log.name}</td>
+         <td>วันที่ ${log.day_no}</td>
+         <td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span>${lateBadge}</td>
+         <td class="small text-muted">${log.timestamp}</td>
+         <td class="small text-muted text-start" style="max-width: 250px; white-space: normal; word-break: break-word;">${displayNote}</td>
+       </tr>
+     `; 
   });
   
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredMentorData.length)} จาก ${filteredMentorData.length} รายการ`;
   renderPaginationControls(Math.ceil(filteredMentorData.length / rowsPerPage), 'mentor');
 }
+
 function changeMentorPage(page) { mentorCurrentPage = page; renderMentorPaginatedTable(); }
 
 // ==========================================
