@@ -108,7 +108,10 @@ async function loadAttendanceUI() {
       const { schedule, serverDate, serverTime } = res;
       if(schedule.length === 0) { container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>'; return; }
       schedule.forEach(day => {
-        let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${day.date})</span></h6><div class="d-flex flex-wrap gap-2">`;
+        // 📌 นำฟังก์ชันแปลงวันที่ไทยมาครอบ day.date ไว้
+        const thDate = formatThaiDate(day.date); 
+        
+        let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${thDate})</span></h6><div class="d-flex flex-wrap gap-2">`;
         day.slots.forEach(slot => {
           const isActive = (day.date === serverDate) && (serverTime >= slot.start && serverTime <= slot.end);
           if (isActive) html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
