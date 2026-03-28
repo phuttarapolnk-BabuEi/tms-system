@@ -1,8 +1,7 @@
 // ==========================================
 // 📌 นำ URL จาก Google Apps Script มาวางในเครื่องหมายคำพูดด้านล่างนี้
 // ==========================================
-const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
-
+const API_URL = "https://script.google.com/macros/s/AKfycbyk2rVpectedQjbsx8mNpWKPvzh-FhAgy2-eQpL7UYQ_-cKmtDneIFFeNHHfami_IPx/exec";
 
 let currentUser = null;          
 let globalProgressData = [];     
@@ -108,19 +107,29 @@ async function loadAttendanceUI() {
       const { schedule, serverDate, serverTime, checkedInSlots } = res; 
       if(schedule.length === 0) { container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>'; return; }
       
+      const currentDT = serverDate + ' ' + serverTime;
+
       schedule.forEach(day => {
         const thDate = formatThaiDate(day.date); 
         let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${thDate})</span></h6><div class="d-flex flex-wrap gap-2">`;
         
         day.slots.forEach(slot => {
-          const isActive = (day.date === serverDate) && (serverTime >= slot.start && serverTime <= slot.end);
+          const startDT = day.date + ' ' + slot.start;
+          const endDT = day.date + ' ' + slot.end;
+          
+          const isActive = (currentDT >= startDT && currentDT <= endDT); 
+          const isExpired = (currentDT > endDT); 
+          
           const slotKey = day.dayNo + '_' + slot.id;
           const isCheckedIn = checkedInSlots && checkedInSlots.includes(slotKey); 
 
+          // 📌 จุดอัปเดต: ถ้า Expired จะเป็นปุ่มสีเหลือง และกดสายได้
           if (isCheckedIn) {
              html += `<button class="btn btn-secondary shadow-sm rounded-pill px-3 opacity-75" disabled><i class="bi bi-check2-all"></i> ${slot.label} (ลงแล้ว) <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
           } else if (isActive) {
-             html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-geo-alt-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+             html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}', false)"><i class="bi bi-geo-alt-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          } else if (isExpired) {
+             html += `<button class="btn btn-warning text-dark shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}', true)"><i class="bi bi-clock-history"></i> ${slot.label} (สาย) <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
           } else {
              html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
           }
@@ -133,11 +142,15 @@ async function loadAttendanceUI() {
   } catch (e) { container.innerHTML = `<div class="text-danger small">ขัดข้องทางเทคนิค</div>`; }
 }
 
-async function checkInModal(dayNo, timeSlot) {
-  const { value: note } = await Swal.fire({ title: `ลงเวลา (${timeSlot})`, input: 'textarea', inputPlaceholder: 'พิมพ์เป้าหมาย/สะท้อนผล...', showCancelButton: true, confirmButtonText: 'บันทึกเวลา' });
+// 📌 จุดอัปเดต: รับค่า isLate เพื่อแนบแท็ก [สาย] ไปบันทึก
+async function checkInModal(dayNo, timeSlot, isLate = false) {
+  const titleText = isLate ? `ลงเวลา (${timeSlot}) - สาย` : `ลงเวลา (${timeSlot})`;
+  const { value: note } = await Swal.fire({ title: titleText, input: 'textarea', inputPlaceholder: 'พิมพ์เป้าหมาย/สะท้อนผล...', showCancelButton: true, confirmButtonText: 'บันทึกเวลา' });
+  
   if (note !== undefined) {
+    const finalNote = isLate ? '[สาย] ' + note : note; // แนบแท็กไปเก็บใน Note 
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-    const res = await callAPI('recordAttendance', { personalId: currentUser.personal_id, dayNo: dayNo, timeSlot: timeSlot, note: note });
+    const res = await callAPI('recordAttendance', { personalId: currentUser.personal_id, dayNo: dayNo, timeSlot: timeSlot, note: finalNote });
     if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); loadAttendanceUI(); } 
     else { Swal.fire('แจ้งเตือน', res.message, 'warning'); }
   }
@@ -397,7 +410,14 @@ function renderMentorPaginatedTable() {
   if (filteredMentorData.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'; return; }
   const startIdx = (mentorCurrentPage - 1) * rowsPerPage; const paginatedItems = filteredMentorData.slice(startIdx, startIdx + rowsPerPage);
   const timeTranslates = { 'Morning': 'เช้า', 'Afternoon': 'บ่าย', 'Evening': 'เย็น', 'Checkout': 'สะท้อนผล' };
-  paginatedItems.forEach(log => { tbody.innerHTML += `<tr><td class="ps-3"><code>${log.personal_id}</code></td><td class="text-start">${log.name}</td><td>วันที่ ${log.day_no}</td><td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span></td><td class="small text-muted">${log.timestamp}</td></tr>`; });
+  
+  // 📌 จุดอัปเดต: ถ้าเจอคำว่า [สาย] ให้แปะป้ายแจ้ง Mentor
+  paginatedItems.forEach(log => { 
+     const isLate = log.note && log.note.includes('[สาย]');
+     const lateBadge = isLate ? `<span class="badge bg-warning text-dark ms-2">สาย</span>` : '';
+     tbody.innerHTML += `<tr><td class="ps-3"><code>${log.personal_id}</code></td><td class="text-start">${log.name}</td><td>วันที่ ${log.day_no}</td><td><span class="badge bg-secondary">${timeTranslates[log.time_slot] || log.time_slot}</span>${lateBadge}</td><td class="small text-muted">${log.timestamp}</td></tr>`; 
+  });
+  
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredMentorData.length)} จาก ${filteredMentorData.length} รายการ`;
   renderPaginationControls(Math.ceil(filteredMentorData.length / rowsPerPage), 'mentor');
 }
@@ -479,17 +499,27 @@ function renderPaginatedTable() {
   const startIdx = (currentPage - 1) * rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
 
-  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>'; const crossMark = '<span class="text-muted opacity-25">-</span>';
+  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>'; 
+  const crossMark = '<span class="text-muted opacity-25">-</span>';
+  const lateMark = '<span class="badge bg-warning text-dark">สาย</span>';
 
   paginatedItems.forEach(p => { 
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; let attendanceHtml = '';
     
+    // 📌 จุดอัปเดต: ถ้าเป็น LATE ให้แสดงป้ายสายในตาราง
     if (globalSchedule && globalSchedule.length > 0) {
       globalSchedule.forEach(day => {
         day.slots.forEach((slot, index) => {
            let isEnd = (index === day.slots.length - 1) ? 'class="border-end"' : '';
-           if (att[day.dayNo] && att[day.dayNo][slot.id]) { count++; attendanceHtml += `<td ${isEnd}>${checkMark}</td>`; } 
+           if (att[day.dayNo] && att[day.dayNo][slot.id]) { 
+               count++; 
+               if (att[day.dayNo][slot.id] === 'LATE') {
+                  attendanceHtml += `<td ${isEnd}>${lateMark}</td>`; 
+               } else {
+                  attendanceHtml += `<td ${isEnd}>${checkMark}</td>`; 
+               }
+           } 
            else { attendanceHtml += `<td ${isEnd}>${crossMark}</td>`; }
         });
       });
@@ -550,9 +580,10 @@ function exportProgressTableToCSV() {
       });
     });
   }
-  csvHeader += `"รวมเวลา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
+  csvHeader += `"รวม (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
   let csvContent = csvHeader;
 
+  // 📌 จุดอัปเดต: ถ้าเป็น LATE ให้ใส่ใน Excel ว่า "สาย"
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; let rowCsv = `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}",`;
@@ -560,7 +591,12 @@ function exportProgressTableToCSV() {
     if (globalSchedule && globalSchedule.length > 0) {
       globalSchedule.forEach(day => {
         day.slots.forEach(slot => {
-          if (att[day.dayNo] && att[day.dayNo][slot.id]) { count++; rowCsv += `"มา",`; } else { rowCsv += `"ขาด",`; }
+          if (att[day.dayNo] && att[day.dayNo][slot.id]) { 
+              count++; 
+              if (att[day.dayNo][slot.id] === 'LATE') { rowCsv += `"สาย",`; } else { rowCsv += `"มา",`; }
+          } else { 
+              rowCsv += `"ขาด",`; 
+          }
         });
       });
     }
@@ -732,8 +768,7 @@ function renderEvaluationDetail() {
           </tr>`;
         });
         
-        // สรุปผลรายด้าน
-        let catMean = 0, catSd = 0; const catCount = catScores.length;
+        const catCount = catScores.length; let catMean = 0, catSd = 0;
         if(catCount > 0) { catMean = catScores.reduce((a,b)=>a+b, 0) / catCount; let catVariance = 0; if(catCount > 1) catVariance = catScores.reduce((a,b)=>a+Math.pow(b-catMean, 2), 0) / (catCount-1); catSd = Math.sqrt(catVariance); }
         ratingHtml += `<tr class="table-info fw-bold">
             <td class="text-end pe-4 text-info-emphasis">สรุปผล ${cat}</td>
@@ -743,8 +778,7 @@ function renderEvaluationDetail() {
           </tr>`;
     });
     
-    // สรุปรวมทุกด้าน
-    let allMean = 0, allSd = 0; const allCount = allRatingScores.length;
+    const allCount = allRatingScores.length; let allMean = 0, allSd = 0;
     if(allCount > 0) { allMean = allRatingScores.reduce((a,b)=>a+b, 0) / allCount; let allVariance = 0; if(allCount > 1) allVariance = allRatingScores.reduce((a,b)=>a+Math.pow(b-allMean, 2), 0) / (allCount-1); allSd = Math.sqrt(allVariance); }
     ratingHtml += `<tr class="table-primary fw-bold" style="border-top: 2px solid #0d6efd;">
         <td class="text-end pe-4 fs-5 text-primary">สรุปรวมทุกด้าน</td>
