@@ -310,14 +310,47 @@ function renderSurveyUI(surveyData, targetId, title) {
 // ==========================================
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
+  const tTraineeBody = document.getElementById('mentor-trainees-body');
+  const linkContainer = document.getElementById('mentor-link-container');
+  
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
+  tTraineeBody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังโหลดรายชื่อ...</td></tr>';
+  
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
+  
   if (res.status === 'success') { 
     globalMentorData = res.data; 
     
+    // 📌 1. วาดปุ่มลิงก์บันทึกคะแนน
+    if (res.mentorLink && res.mentorLink.trim() !== '') {
+       linkContainer.innerHTML = `<a href="${res.mentorLink}" target="_blank" class="btn btn-primary rounded-pill shadow-sm fw-bold px-4"><i class="bi bi-box-arrow-up-right"></i> เปิดลิงก์บันทึกคะแนน</a>`;
+    } else {
+       linkContainer.innerHTML = `<span class="badge bg-light text-muted border py-2 px-3 fw-normal">ยังไม่มีลิงก์บันทึกคะแนน</span>`;
+    }
+
+    // 📌 2. วาดตารางรายชื่อผู้เข้าอบรม
+    tTraineeBody.innerHTML = '';
+    if (res.traineesInfo && res.traineesInfo.length > 0) {
+       res.traineesInfo.forEach((t, idx) => {
+          tTraineeBody.innerHTML += `
+            <tr>
+              <td class="fw-bold text-muted">${idx + 1}</td>
+              <td class="text-start fw-bold">${t.name} <br><small class="text-muted fw-normal">รหัส: <code>${t.id}</code></small></td>
+              <td>${t.area}</td>
+              <td>${t.cluster}</td>
+              <td><span class="badge bg-light text-dark border">กลุ่ม ${t.group}</span></td>
+            </tr>
+          `;
+       });
+    } else {
+       tTraineeBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบข้อมูลผู้เข้าอบรมในความดูแล</td></tr>';
+    }
+    
+    // 📌 3. สร้างตัวเลือก "วันที่" ใน Dropdown
     const dayFilter = document.getElementById('mentor-filter-day');
     const currentVal = dayFilter.value; 
     dayFilter.innerHTML = '<option value="ALL">ทุกวัน</option>';
+    
     if (res.schedule && res.schedule.length > 0) {
       res.schedule.forEach(d => {
         const thDate = formatThaiDate(d.date);
@@ -326,10 +359,15 @@ async function fetchMentorData() {
     }
     dayFilter.value = currentVal || 'ALL'; 
 
-    renderMentorChart(); filterMentorTable(); 
+    renderMentorChart(); 
+    filterMentorTable(); 
   } 
-  else { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; }
+  else { 
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+    tTraineeBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+  }
 }
+
 function renderMentorChart() { 
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
   globalMentorData.forEach(log => { if(counts[log.time_slot] !== undefined) counts[log.time_slot]++; });

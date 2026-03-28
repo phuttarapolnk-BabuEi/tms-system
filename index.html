@@ -109,41 +109,88 @@
 
     <div id="mentor-view" class="app-view">
       <h4 class="mb-4 text-secondary"><i class="bi bi-people-fill"></i> แดชบอร์ดวิทยากรพี่เลี้ยง</h4>
-      <div class="row mb-4">
-        <div class="col-12">
+      
+      <ul class="nav nav-pills mb-4 bg-white p-2 rounded-pill shadow-sm" id="mentorTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#mentor-group">👥 ข้อมูลกลุ่ม</a></li>
+        <li class="nav-item"><a class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#mentor-stats">📊 สถิติการลงเวลา</a></li>
+        <li class="nav-item"><a class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" href="#mentor-history">🕒 ประวัติลงเวลา</a></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="mentor-group">
+           <div class="card shadow-sm border-0 rounded-4 mb-4 border-start border-primary border-4">
+             <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                   <h6 class="fw-bold mb-1 text-primary"><i class="bi bi-link-45deg"></i> ลิงก์บันทึกคะแนนผู้เข้าอบรม</h6>
+                   <small class="text-muted">คลิกปุ่มด้านขวาเพื่อเปิดแบบฟอร์ม / Google Sheet สำหรับบันทึกคะแนน</small>
+                </div>
+                <div id="mentor-link-container">
+                   <div class="spinner-border spinner-border-sm text-primary"></div> กำลังโหลด...
+                </div>
+             </div>
+           </div>
+
+           <div class="card shadow-sm border-0 rounded-4">
+             <div class="card-header bg-white fw-bold pt-3 pb-3 border-0 d-flex justify-content-between align-items-center">
+               <span><i class="bi bi-person-lines-fill text-success"></i> รายชื่อผู้เข้าอบรมในความดูแล</span>
+               <button class="btn btn-sm btn-light rounded-circle" onclick="fetchMentorData()"><i class="bi bi-arrow-clockwise"></i></button>
+             </div>
+             <div class="card-body p-0 table-responsive">
+               <table class="table table-hover mb-0 text-center align-middle" style="font-size: 0.9rem;">
+                 <thead class="table-light">
+                   <tr>
+                     <th style="width: 80px;">ลำดับ</th>
+                     <th class="text-start">ชื่อ-สกุล</th>
+                     <th>สังกัด (Area Service)</th>
+                     <th>คลัสเตอร์</th>
+                     <th>กลุ่มเป้าหมาย</th>
+                   </tr>
+                 </thead>
+                 <tbody id="mentor-trainees-body">
+                   <tr><td colspan="5" class="text-center py-4 text-muted">กำลังโหลดข้อมูล...</td></tr>
+                 </tbody>
+               </table>
+             </div>
+           </div>
+        </div>
+
+        <div class="tab-pane fade" id="mentor-stats">
           <div class="card shadow-sm border-0 rounded-4">
             <div class="card-header bg-white fw-bold pt-3 border-0 d-flex justify-content-between align-items-center">
               <span><i class="bi bi-bar-chart-fill text-primary"></i> สถิติการลงเวลาของผู้เข้าอบรมในความดูแล</span>
               <button class="btn btn-sm btn-light rounded-circle" onclick="fetchMentorData()"><i class="bi bi-arrow-clockwise"></i></button>
             </div>
-            <div class="card-body"><canvas id="mentorBarChart" style="max-height: 250px;"></canvas></div>
+            <div class="card-body"><canvas id="mentorBarChart" style="max-height: 300px;"></canvas></div>
           </div>
         </div>
-      </div>
-      
-      <div class="card shadow-sm border-0 rounded-4">
-        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center border-0 pt-3 pb-3 gap-2">
-          <span class="fw-bold text-success"><i class="bi bi-list-columns"></i> ประวัติการลงเวลา (กลุ่มของฉัน)</span>
-          <div class="d-flex gap-2 w-auto">
-            <select id="mentor-filter-day" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterMentorTable()">
-              <option value="ALL">ทุกวัน</option>
-            </select>
-            <select id="mentor-filter-time" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterMentorTable()">
-              <option value="ALL">ทุกช่วงเวลา</option><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option><option value="Evening">เย็น</option><option value="Checkout">สะท้อนผล</option>
-            </select>
-            <input type="text" id="mentor-search" class="form-control form-control-sm rounded-pill shadow-sm w-auto" style="max-width: 150px;" placeholder="ค้นหาชื่อ..." onkeyup="filterMentorTable()">
+
+        <div class="tab-pane fade" id="mentor-history">
+          <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center border-0 pt-3 pb-3 gap-2">
+              <span class="fw-bold text-success"><i class="bi bi-list-columns"></i> ประวัติการลงเวลา</span>
+              <div class="d-flex gap-2 w-auto">
+                <select id="mentor-filter-day" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterMentorTable()"><option value="ALL">ทุกวัน</option></select>
+                <select id="mentor-filter-time" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterMentorTable()">
+                  <option value="ALL">ทุกช่วงเวลา</option><option value="Morning">เช้า</option><option value="Afternoon">บ่าย</option><option value="Evening">เย็น</option><option value="Checkout">สะท้อนผล</option>
+                </select>
+                <input type="text" id="mentor-search" class="form-control form-control-sm rounded-pill shadow-sm w-auto" style="max-width: 150px;" placeholder="ค้นหาชื่อ..." onkeyup="filterMentorTable()">
+                <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchMentorData()"><i class="bi bi-arrow-clockwise"></i></button>
+              </div>
+            </div>
+            <div class="card-body p-0 table-responsive">
+              <table class="table table-striped mb-0 text-center align-middle" style="font-size: 0.9rem;">
+                <thead class="table-dark"><tr><th>รหัส</th><th class="text-start">ชื่อ-สกุล</th><th>วันที่</th><th>ช่วงเวลา</th><th>เวลาที่บันทึก</th></tr></thead>
+                <tbody id="mentor-table-body"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white border-0 d-flex flex-wrap justify-content-between align-items-center py-3">
+              <small class="text-muted" id="mentor-pagination-info">แสดง 0 ถึง 0 จาก 0 รายการ</small>
+              <nav><ul class="pagination pagination-sm mb-0" id="mentor-pagination-controls"></ul></nav>
+            </div>
           </div>
         </div>
-        <div class="card-body p-0 table-responsive">
-          <table class="table table-striped mb-0">
-            <thead class="table-dark"><tr><th class="ps-3">รหัส</th><th>ชื่อ-สกุล</th><th>วันที่</th><th>ช่วงเวลา</th><th>เวลาที่บันทึก</th></tr></thead>
-            <tbody id="mentor-table-body"></tbody>
-          </table>
-        </div>
-        <div class="card-footer bg-white border-0 d-flex flex-wrap justify-content-between align-items-center py-3">
-          <small class="text-muted" id="mentor-pagination-info">แสดง 0 ถึง 0 จาก 0 รายการ</small>
-          <nav><ul class="pagination pagination-sm mb-0" id="mentor-pagination-controls"></ul></nav>
-        </div>
+
       </div>
     </div>
 
@@ -338,6 +385,6 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <script src="script.js?v=63"></script> 
+  <script src="script.js?v=64"></script> 
 </body>
 </html>
