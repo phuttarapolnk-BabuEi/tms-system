@@ -102,21 +102,32 @@ async function loadAttendanceUI() {
   if(!container) return;
   container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> <span class="small text-muted">กำลังซิงค์เวลาเซิร์ฟเวอร์...</span></div>';
   try {
-    const res = await callAPI('getAttendanceConfig');
+    // 📌 ส่งรหัสประจำตัวไปให้ Server เพื่อขอประวัติการลงเวลามาด้วย
+    const res = await callAPI('getAttendanceConfig', { personalId: currentUser.personal_id });
     if (res.status === 'success') {
       container.innerHTML = ''; 
-      const { schedule, serverDate, serverTime } = res;
+      const { schedule, serverDate, serverTime, checkedInSlots } = res; // 📌 รับ checkedInSlots กลับมา
       if(schedule.length === 0) { container.innerHTML = '<div class="alert alert-warning small">ขณะนี้ไม่มีรอบการลงเวลาที่เปิดใช้งาน</div>'; return; }
+      
       schedule.forEach(day => {
-        // 📌 นำฟังก์ชันแปลงวันที่ไทยมาครอบ day.date ไว้
         const thDate = formatThaiDate(day.date); 
-        
         let html = `<div class="mb-3 border-bottom pb-2"><h6 class="fw-bold text-secondary mb-2">วันที่ ${day.dayNo} <span class="small fw-normal text-muted">(${thDate})</span></h6><div class="d-flex flex-wrap gap-2">`;
+        
         day.slots.forEach(slot => {
           const isActive = (day.date === serverDate) && (serverTime >= slot.start && serverTime <= slot.end);
-          if (isActive) html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-check-circle-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
-          else html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          const slotKey = day.dayNo + '_' + slot.id;
+          const isCheckedIn = checkedInSlots && checkedInSlots.includes(slotKey); // 📌 เช็กว่าลงรอบนี้ไปหรือยัง
+
+          // 📌 วาดปุ่มตามสถานะ (ลงแล้ว / เปิดให้ลง / ปิดอยู่)
+          if (isCheckedIn) {
+             html += `<button class="btn btn-secondary shadow-sm rounded-pill px-3 opacity-75" disabled><i class="bi bi-check2-all"></i> ${slot.label} (ลงแล้ว) <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          } else if (isActive) {
+             html += `<button class="btn btn-success shadow-sm rounded-pill px-3" onclick="checkInModal('${day.dayNo}', '${slot.id}')"><i class="bi bi-geo-alt-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          } else {
+             html += `<button class="btn btn-outline-secondary rounded-pill px-3 opacity-50" disabled><i class="bi bi-lock-fill"></i> ${slot.label} <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
+          }
         });
+        
         html += `</div></div>`;
         container.innerHTML += html;
       });
