@@ -499,21 +499,22 @@ function renderPaginatedTable() {
   const startIdx = (currentPage - 1) * rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
 
-  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5"></i>'; 
+  // 📌 จุดอัปเดต: เปลี่ยน Late ให้เป็นเครื่องหมายถูกสีเหลือง
+  const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5" title="มาปกติ"></i>'; 
   const crossMark = '<span class="text-muted opacity-25">-</span>';
-  const lateMark = '<span class="badge bg-warning text-dark">สาย</span>';
+  const lateMark = '<i class="bi bi-check-circle-fill text-warning fs-5" title="มาสาย"></i>'; 
 
   paginatedItems.forEach(p => { 
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; let attendanceHtml = '';
     
-    // 📌 จุดอัปเดต: ถ้าเป็น LATE ให้แสดงป้ายสายในตาราง
     if (globalSchedule && globalSchedule.length > 0) {
       globalSchedule.forEach(day => {
         day.slots.forEach((slot, index) => {
            let isEnd = (index === day.slots.length - 1) ? 'class="border-end"' : '';
            if (att[day.dayNo] && att[day.dayNo][slot.id]) { 
                count++; 
+               // 📌 ถ้าสถานะเป็น LATE ให้ใส่เครื่องหมายถูกสีเหลือง
                if (att[day.dayNo][slot.id] === 'LATE') {
                   attendanceHtml += `<td ${isEnd}>${lateMark}</td>`; 
                } else {
