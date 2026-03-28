@@ -3,6 +3,7 @@
 // ==========================================
 const API_URL = "https://script.google.com/macros/s/AKfycbxwCOOKsedfJw80Xjknrl9EYYnU6uWH6YHlPgtwlSSvDGTW_dWvRgybcJko-wN5TTfm/exec";
 
+
 let currentUser = null;          
 let globalProgressData = [];     
 let filteredProgressData = [];   
@@ -160,10 +161,16 @@ async function openExamModal(testType) {
     let iconType = checkRes.reason === 'completed' ? 'success' : 'warning';
     return Swal.fire('แจ้งเตือน', checkRes.message, iconType);
   }
+  
   Swal.fire({ title: 'กำลังโหลดข้อสอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-  const res = await callAPI('getQuestions', { qType: 'TEST' });
-  if (res.status === 'success') { Swal.close(); renderExamUI(res.data, testType); } 
-  else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
+  const res = await callAPI('getQuestions', { qType: testType }); 
+  
+  if (res.status === 'success') { 
+     Swal.close(); 
+     renderExamUI(res.data, testType); 
+  } else { 
+     Swal.fire('ข้อผิดพลาด', res.message, 'error'); 
+  }
 }
 
 function renderExamUI(examData, testType) {
@@ -624,7 +631,7 @@ function renderTestSummary(type) {
 }
 
 // ----------------------------------------
-// 📌 Admin: สรุปผลประเมิน (อัปเกรด สรุปรายด้าน และ รวมทุกด้าน)
+// 📌 Admin: สรุปผลประเมิน (สรุปรายด้าน และ รวมทุกด้าน)
 // ----------------------------------------
 async function fetchEvaluationSummary() {
   const container = document.getElementById('eval-detail-container');
