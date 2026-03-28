@@ -19,7 +19,7 @@ let mentorCurrentPage = 1;
 let globalEvalData = null; 
 let preChartInstance = null; 
 let postChartInstance = null; 
-let globalSchedule = []; // 📌 เก็บโครงสร้างตารางเวลาอัจฉริยะ
+let globalSchedule = []; 
 
 // ==========================================
 // 📌 2. ฟังก์ชันหลัก (Core Functions)
@@ -35,15 +35,14 @@ async function callAPI(action, payload = {}) {
   } catch (error) { throw new Error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
 }
 
-// 📌 ฟังก์ชันแปลงวันที่ YYYY-MM-DD เป็น 30 มี.ค. 69 แบบฉลาด
 function formatThaiDate(dateStr) {
    if(!dateStr) return '';
    let d = new Date(dateStr);
    if(isNaN(d.getTime())) {
       const parts = dateStr.split(/[-/]/);
       if(parts.length === 3) {
-         if(parts[2].length === 4) d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // DD/MM/YYYY
-         else d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`); // YYYY-MM-DD
+         if(parts[2].length === 4) d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); 
+         else d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`); 
       }
    }
    if(isNaN(d.getTime())) return dateStr;
@@ -222,7 +221,17 @@ async function openSpeakerListModal() {
   } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
 }
 
+// 📌 อัปเดต: เพิ่มการเช็กสิทธิ์และเช็กเวลาก่อนประเมิน
 async function openSurveyModal(targetId, customTitle = null, surveyType = 'PROJECT_SURVEY') {
+  Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+  
+  const checkRes = await callAPI('checkSurveyEligibility', { personalId: currentUser.personal_id, targetId: targetId });
+  if (checkRes.status !== 'success') return Swal.fire('ข้อผิดพลาด', checkRes.message, 'error');
+  if (!checkRes.eligible) {
+     let iconType = checkRes.message.includes('เรียบร้อย') ? 'success' : 'warning';
+     return Swal.fire('แจ้งเตือน', checkRes.message, iconType);
+  }
+
   Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
   const res = await callAPI('getQuestions', { qType: surveyType }); 
   if (res.status === 'success') { 
@@ -288,33 +297,25 @@ function renderSurveyUI(surveyData, targetId, title) {
 async function fetchMentorData() {
   const tbody = document.getElementById('mentor-table-body');
   tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
-  
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
-  
   if (res.status === 'success') { 
     globalMentorData = res.data; 
     
-    // 📌 สร้างตัวเลือก "วันที่" ใน Dropdown แบบอัตโนมัติ
     const dayFilter = document.getElementById('mentor-filter-day');
-    const currentVal = dayFilter.value; // จำค่าเดิมที่เลือกไว้
+    const currentVal = dayFilter.value; 
     dayFilter.innerHTML = '<option value="ALL">ทุกวัน</option>';
-    
     if (res.schedule && res.schedule.length > 0) {
       res.schedule.forEach(d => {
         const thDate = formatThaiDate(d.date);
         dayFilter.innerHTML += `<option value="${d.dayNo}">วันที่ ${d.dayNo} (${thDate})</option>`;
       });
     }
-    dayFilter.value = currentVal || 'ALL'; // คืนค่าที่เลือก
-    
-    renderMentorChart(); 
-    filterMentorTable(); 
-  } 
-  else { 
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
-  }
-}
+    dayFilter.value = currentVal || 'ALL'; 
 
+    renderMentorChart(); filterMentorTable(); 
+  } 
+  else { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; }
+}
 function renderMentorChart() { 
   const counts = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Checkout': 0 };
   globalMentorData.forEach(log => { if(counts[log.time_slot] !== undefined) counts[log.time_slot]++; });
@@ -366,7 +367,6 @@ function filterProgressTable() {
   currentPage = 1; renderPaginatedTable();
 }
 
-// 📌 1. วาดหัวตารางแบบอัจฉริยะ ดึงวันที่จากหลังบ้านมาสร้าง
 function renderPaginatedTable() {
   const thead = document.querySelector('#progress-table-body').closest('table').querySelector('thead');
   const tbody = document.getElementById('progress-table-body');
@@ -405,7 +405,6 @@ function renderPaginatedTable() {
   
   thead.innerHTML = topRow + bottomRow;
 
-  // 📌 2. วาดข้อมูลแถวผู้เข้าอบรม
   tbody.innerHTML = '';
   if (filteredProgressData.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${6 + totalSlots}" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>`;
@@ -473,7 +472,6 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
-// 📌 อัปเดตฟังก์ชันดาวน์โหลด Excel แบบอัจฉริยะ โหลดหัวตารางให้ตรงกับในหน้าเว็บ
 function exportProgressTableToCSV() {
   if (!filteredProgressData || filteredProgressData.length === 0) return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
   
@@ -488,7 +486,7 @@ function exportProgressTableToCSV() {
       });
     });
   }
-  csvHeader += `"รวมเวลา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
+  csvHeader += `"รวม (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
   let csvContent = csvHeader;
 
   filteredProgressData.forEach(p => {
@@ -739,7 +737,8 @@ async function loadExamConfigToUI() {
     const formatDT = (dtStr) => { if(!dtStr) return ""; let d = new Date(dtStr); if(isNaN(d.getTime())) { d = new Date(dtStr.replace(" ", "T")); if(isNaN(d.getTime())) return ""; } const pad = (n) => n.toString().padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
     res.data.forEach((row) => {
       const isChecked = row[3].toString().toUpperCase() === 'TRUE' ? 'checked' : '';
-      tbody.innerHTML += `<tr><td><select class="form-select form-select-sm exam-type mx-auto text-center fw-bold text-secondary" style="width: 150px;"><option value="PRE" ${row[0].toUpperCase() === 'PRE' ? 'selected' : ''}>PRE-TEST</option><option value="POST" ${row[0].toUpperCase() === 'POST' ? 'selected' : ''}>POST-TEST</option></select></td><td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" value="${formatDT(row[1])}" style="max-width: 220px;"></td><td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" value="${formatDT(row[2])}" style="max-width: 220px;"></td><td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" ${isChecked}></div></td><td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td></tr>`;
+      // 📌 อัปเดตเมนูตั้งเวลา ให้ Admin เลือกตั้งเวลาเปิดปิด PROJECT ได้
+      tbody.innerHTML += `<tr><td><select class="form-select form-select-sm exam-type mx-auto text-center fw-bold text-secondary" style="width: 150px;"><option value="PRE" ${row[0].toUpperCase() === 'PRE' ? 'selected' : ''}>PRE-TEST</option><option value="POST" ${row[0].toUpperCase() === 'POST' ? 'selected' : ''}>POST-TEST</option><option value="PROJECT" ${row[0].toUpperCase() === 'PROJECT' ? 'selected' : ''}>ประเมินโครงการ (PROJECT)</option></select></td><td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" value="${formatDT(row[1])}" style="max-width: 220px;"></td><td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" value="${formatDT(row[2])}" style="max-width: 220px;"></td><td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" ${isChecked}></div></td><td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td></tr>`;
     });
   }
 }
@@ -747,7 +746,7 @@ async function loadExamConfigToUI() {
 function addExamConfigRow() {
   const tbody = document.getElementById('exam-config-table-body'); if(!tbody) return;
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td><select class="form-select form-select-sm exam-type border-info mx-auto text-center fw-bold text-info" style="width: 150px;"><option value="PRE">PRE-TEST</option><option value="POST">POST-TEST</option></select></td><td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" style="max-width: 220px;"></td><td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" style="max-width: 220px;"></td><td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" checked></div></td><td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>`;
+  tr.innerHTML = `<td><select class="form-select form-select-sm exam-type border-info mx-auto text-center fw-bold text-info" style="width: 150px;"><option value="PRE">PRE-TEST</option><option value="POST">POST-TEST</option><option value="PROJECT">ประเมินโครงการ (PROJECT)</option></select></td><td><input type="datetime-local" class="form-control form-control-sm exam-start mx-auto" style="max-width: 220px;"></td><td><input type="datetime-local" class="form-control form-control-sm exam-end mx-auto" style="max-width: 220px;"></td><td><div class="form-check form-switch d-flex justify-content-center m-0"><input class="form-check-input exam-active" type="checkbox" checked></div></td><td><button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>`;
   tbody.appendChild(tr);
 }
 
