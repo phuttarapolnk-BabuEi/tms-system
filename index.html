@@ -134,9 +134,11 @@
            <div class="card shadow-sm border-0 rounded-4">
              <div class="card-header bg-white pt-3 pb-3 border-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
                <span class="fw-bold"><i class="bi bi-person-lines-fill text-success"></i> รายชื่อผู้เข้าอบรมในความดูแล</span>
+               
                <div class="small d-flex flex-wrap gap-3 bg-light px-3 py-1 rounded-pill border border-light shadow-sm">
                  <span class="text-muted"><i class="bi bi-check-circle-fill text-success"></i> ในเวลาที่กำหนด</span>
                  <span class="text-muted"><i class="bi bi-check-circle-fill text-warning"></i> สาย</span>
+                 <span class="text-muted"><span class="fw-bold">-</span> ยังไม่ลงเวลา</span>
                </div>
 
                <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchMentorData()"><i class="bi bi-arrow-clockwise"></i></button>
@@ -223,6 +225,13 @@
               <div class="card shadow-sm border-0 rounded-4 mt-2">
                 <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center border-0 pt-3 pb-3 gap-2">
                   <span class="fw-bold text-success"><i class="bi bi-list-check"></i> ตารางสรุปภาระงาน</span>
+                  
+                  <div class="small d-flex flex-wrap gap-3 bg-light px-3 py-1 rounded-pill border border-light shadow-sm">
+                    <span class="text-muted"><i class="bi bi-check-circle-fill text-success"></i> ในเวลาที่กำหนด</span>
+                    <span class="text-muted"><i class="bi bi-check-circle-fill text-warning"></i> สาย</span>
+                    <span class="text-muted"><span class="fw-bold">-</span> ไม่ลงเวลา</span>
+                  </div>
+
                   <div class="d-flex gap-2 w-auto">
                     <select id="filter-group-target" class="form-select form-select-sm rounded-pill shadow-sm w-auto" onchange="filterProgressTable()">
                       <option value="ALL">ทุกกลุ่มเป้าหมาย</option>
@@ -245,6 +254,7 @@
                     <button class="btn btn-sm btn-success rounded-pill shadow-sm fw-bold px-3" onclick="exportProgressTableToCSV()"><i class="bi bi-file-earmark-excel"></i> นำออกข้อมูล</button>
                     <button class="btn btn-sm btn-light rounded-circle shadow-sm" onclick="fetchProgressData()"><i class="bi bi-arrow-clockwise"></i></button>
                   </div>
+                </div>
                 </div>
                 <div class="card-body p-0 table-responsive">
                   <table class="table table-bordered table-striped mb-0 text-center align-middle" style="font-size: 0.85rem;">
