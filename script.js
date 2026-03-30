@@ -723,35 +723,41 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
-function exportProgressTableToCSV() {
+function exportProgressTableToCSV() { // คงชื่อฟังก์ชันเดิมไว้ ปุ่ม HTML จะได้ไม่พัง
   if (!filteredProgressData || filteredProgressData.length === 0) return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
   
-  let csvHeader = `"รหัส","ชื่อ-สกุล","คลัสเตอร์","กลุ่ม",`; let totalSlots = 0;
+  let exportData = []; // สร้างกล่องเตรียมเก็บข้อมูลลง Excel
+
+  // --- สร้างหัวตาราง (Header) ---
+  let headerRow = ["รหัส", "ชื่อ-สกุล", "คลัสเตอร์", "กลุ่ม"];
+  let totalSlots = 0;
   if (globalSchedule && globalSchedule.length > 0) {
     globalSchedule.forEach(day => {
       const thDate = formatThaiDate(day.date);
       day.slots.forEach(slot => {
         totalSlots++;
         let slotName = slot.id === 'Morning' ? 'เช้า' : slot.id === 'Afternoon' ? 'บ่าย' : slot.id === 'Evening' ? 'เย็น' : slot.id === 'Checkout' ? 'สะท้อนผล' : slot.label;
-        csvHeader += `"${thDate} (${slotName})",`;
+        headerRow.push(`${thDate} (${slotName})`);
       });
     });
   }
-  csvHeader += `"รวมเวลา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
-  let csvContent = csvHeader;
+  headerRow.push("รวมเวลา (ครั้ง)", "ร้อยละ (%)", "Pre-Test", "ประเมินวิทยากร", "Post-Test", "ความพึงพอใจโครงการ");
+  exportData.push(headerRow); // ใส่หัวตารางลงไปแถวแรก
 
+  // --- สร้างข้อมูลแต่ละคน (Data Rows) ---
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
-    let count = 0; let rowCsv = `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}",`;
+    let count = 0; 
+    let rowData = [p.id, p.name, p.cluster || '-', p.group];
     
     if (globalSchedule && globalSchedule.length > 0) {
       globalSchedule.forEach(day => {
         day.slots.forEach(slot => {
           if (att[day.dayNo] && att[day.dayNo][slot.id]) { 
               count++; 
-              if (att[day.dayNo][slot.id] === 'LATE') { rowCsv += `"สาย",`; } else { rowCsv += `"มา",`; }
+              if (att[day.dayNo][slot.id] === 'LATE') { rowData.push("สาย"); } else { rowData.push("มา"); }
           } else { 
-              rowCsv += `"ขาด",`; 
+              rowData.push("ขาด"); 
           }
         });
       });
@@ -762,11 +768,15 @@ function exportProgressTableToCSV() {
     const evalSpeaker = (surv.speakersEvaluated && surv.speakersEvaluated.length > 0) ? `ประเมินแล้ว (${surv.speakersEvaluated.length} คน)` : "รอประเมิน";
     const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
 
-    csvContent += rowCsv + `"${count}","${percentage}%","${preScore}","${evalSpeaker}","${postScore}","${evalProject}"\n`;
+    rowData.push(count, `${percentage}%`, preScore, evalSpeaker, postScore, evalProject);
+    exportData.push(rowData); // ใส่ข้อมูลลงไปทีละแถว
   });
   
-  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Matrix_Report_${new Date().getTime()}.csv`; link.click();
+  // 🪄 เสกเป็นไฟล์ Excel (.xlsx) ด้วย SheetJS
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(exportData);
+  XLSX.utils.book_append_sheet(wb, ws, "Matrix_Report");
+  XLSX.writeFile(wb, `Matrix_Report_${new Date().getTime()}.xlsx`);
 }
 
 // ----------------------------------------
@@ -969,7 +979,7 @@ function renderEvaluationDetail() {
   container.innerHTML = html;
 }
 
-function exportEvaluationToCSV() {
+function exportEvaluationToCSV() { // คงชื่อฟังก์ชันเดิมไว้ ปุ่ม HTML จะได้ไม่พัง
   const targetId = document.getElementById('eval-target-select').value;
   const selectObj = document.getElementById('eval-target-select'); const targetName = selectObj.options[selectObj.selectedIndex].text;
   if(!targetId || !globalEvalData) return;
@@ -978,15 +988,21 @@ function exportEvaluationToCSV() {
   const expectedQType = targetId === 'PROJECT' ? 'PROJECT_SURVEY' : 'SPEAKER_SURVEY';
   let targetQuestions = []; for (let qId in questions) { if (questions[qId].type === expectedQType) targetQuestions.push({ q_id: qId, ...questions[qId] }); }
 
-  let csvContent = `"รายงานผลการประเมิน: ${targetName}"\n"จำนวนผู้ประเมิน: ${targetSurveys.length} คน"\n\n`;
-
   const categories = [...new Set(targetQuestions.map(q => q.category))];
   const interpret = (m) => { if(m >= 4.5) return 'มากที่สุด'; if(m >= 3.5) return 'มาก'; if(m >= 2.5) return 'ปานกลาง'; if(m >= 1.5) return 'น้อย'; return 'ปรับปรุง'; };
 
-  // นำออก ข้อมูลพื้นฐาน
+  let exportData = []; // สร้างกล่องเตรียมเก็บข้อมูลลง Excel
+
+  // --- ส่วนหัวรายงาน ---
+  exportData.push([`รายงานผลการประเมิน: ${targetName}`]);
+  exportData.push([`จำนวนผู้ประเมิน: ${targetSurveys.length} คน`]);
+  exportData.push([]); // เว้น 1 บรรทัด
+
+  // --- ตอนที่ 1: ข้อมูลพื้นฐาน ---
   const choiceCategories = categories.filter(cat => targetQuestions.some(q => q.category === cat && q.inputType === 'CHOICE'));
   if(choiceCategories.length > 0) {
-      csvContent += `"ตอนที่ 1: ข้อมูลพื้นฐาน"\n"หมวดหมู่","รายการ","ตัวเลือก","จำนวน (คน)","ร้อยละ (%)"\n`;
+      exportData.push(["ตอนที่ 1: ข้อมูลพื้นฐาน"]);
+      exportData.push(["หมวดหมู่", "รายการ", "ตัวเลือก", "จำนวน (คน)", "ร้อยละ (%)"]);
       choiceCategories.forEach(cat => {
         const choiceQuestions = targetQuestions.filter(q => q.category === cat && q.inputType === 'CHOICE');
         choiceQuestions.forEach(q => {
@@ -994,17 +1010,18 @@ function exportEvaluationToCSV() {
            targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if (ans) counts[ans] = (counts[ans] || 0) + 1; });
            q.options.forEach(opt => { 
                const c = counts[opt] || 0; const pct = targetSurveys.length > 0 ? ((c / targetSurveys.length) * 100).toFixed(2) : 0; 
-               csvContent += `"${cat}","${q.text.replace(/"/g, '""')}","${opt}","${c}","${pct}%"\n`;
+               exportData.push([cat, q.text, opt, c, `${pct}%`]);
            });
         });
       });
-      csvContent += `\n`;
+      exportData.push([]); // เว้น 1 บรรทัด
   }
 
-  // นำออก ระดับความพึงพอใจ (พร้อมสรุป)
+  // --- ตอนที่ 2: ระดับความพึงพอใจ ---
   const ratingCategories = categories.filter(cat => targetQuestions.some(q => q.category === cat && q.inputType === 'RATING'));
   if (ratingCategories.length > 0) {
-      csvContent += `"ตอนที่ 2: การประเมินระดับความพึงพอใจ"\n"หมวดหมู่","รายการประเมิน","N","Mean (X-bar)","S.D.","แปลผล"\n`;
+      exportData.push(["ตอนที่ 2: การประเมินระดับความพึงพอใจ"]);
+      exportData.push(["หมวดหมู่", "รายการประเมิน", "N", "Mean (X-bar)", "S.D.", "แปลผล"]);
       let allRatingScores = [];
       
       ratingCategories.forEach(cat => {
@@ -1015,30 +1032,42 @@ function exportEvaluationToCSV() {
              let scores = []; targetSurveys.forEach(s => { const val = parseFloat(s.answers[q.q_id]); if(!isNaN(val)) { scores.push(val); catScores.push(val); allRatingScores.push(val); } });
              const count = scores.length; let mean = 0, sd = 0;
              if(count > 0) { mean = scores.reduce((a,b)=>a+b, 0) / count; if(count > 1) sd = Math.sqrt(scores.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / (count-1)); }
-             csvContent += `"${cat}","${idx+1}. ${q.text.replace(/"/g, '""')}","${count}","${count > 0 ? mean.toFixed(2) : '-'}","${count > 0 ? sd.toFixed(2) : '-'}","${count > 0 ? interpret(mean) : '-'}"\n`;
+             exportData.push([cat, `${idx+1}. ${q.text}`, count, count > 0 ? mean.toFixed(2) : '-', count > 0 ? sd.toFixed(2) : '-', count > 0 ? interpret(mean) : '-']);
          });
          
          const catCount = catScores.length; let catMean = 0, catSd = 0;
          if(catCount > 0) { catMean = catScores.reduce((a,b)=>a+b, 0) / catCount; if(catCount > 1) catSd = Math.sqrt(catScores.reduce((a,b)=>a+Math.pow(b-catMean, 2), 0) / (catCount-1)); }
-         csvContent += `"${cat}","สรุปผล ${cat}","${catCount}","${catCount > 0 ? catMean.toFixed(2) : '-'}","${catCount > 0 ? catSd.toFixed(2) : '-'}","${catCount > 0 ? interpret(catMean) : '-'}"\n`;
+         exportData.push([cat, `สรุปผล ${cat}`, catCount, catCount > 0 ? catMean.toFixed(2) : '-', catCount > 0 ? catSd.toFixed(2) : '-', catCount > 0 ? interpret(catMean) : '-']);
       });
       
       const allCount = allRatingScores.length; let allMean = 0, allSd = 0;
       if(allCount > 0) { allMean = allRatingScores.reduce((a,b)=>a+b, 0) / allCount; if(allCount > 1) allSd = Math.sqrt(allRatingScores.reduce((a,b)=>a+Math.pow(b-allMean, 2), 0) / (allCount-1)); }
-      csvContent += `"ภาพรวม","สรุปรวมทุกด้าน","${allCount}","${allCount > 0 ? allMean.toFixed(2) : '-'}","${allCount > 0 ? allSd.toFixed(2) : '-'}","${allCount > 0 ? interpret(allMean) : '-'}"\n\n`;
+      exportData.push(["ภาพรวม", "สรุปรวมทุกด้าน", allCount, allCount > 0 ? allMean.toFixed(2) : '-', allCount > 0 ? allSd.toFixed(2) : '-', allCount > 0 ? interpret(allMean) : '-']);
+      exportData.push([]); // เว้น 1 บรรทัด
   }
 
-  // นำออก ข้อเสนอแนะ
-  csvContent += `"ตอนที่ 3: ข้อเสนอแนะปลายเปิด"\n`;
+  // --- ตอนที่ 3: ข้อเสนอแนะปลายเปิด (จบปัญหาเรื่องกด Enter แล้วแถวขาด!) ---
+  exportData.push(["ตอนที่ 3: ข้อเสนอแนะปลายเปิด"]);
   const textQuestions = targetQuestions.filter(q => q.inputType === 'TEXT');
   textQuestions.forEach(q => {
-     csvContent += `"${q.text.replace(/"/g, '""')}"\n`; let hasAns = false;
-     targetSurveys.forEach(s => { const ans = s.answers[q.q_id]; if(ans && ans.trim() !== '') { csvContent += `"- ${ans.trim().replace(/"/g, '""')}"\n`; hasAns = true; } });
-     if(!hasAns) csvContent += `"- ไม่มีข้อเสนอแนะ -"\n`; csvContent += `\n`;
+     exportData.push([q.text]); // ชื่อคำถาม
+     let hasAns = false;
+     targetSurveys.forEach(s => { 
+         const ans = s.answers[q.q_id]; 
+         if(ans && ans.trim() !== '') { 
+             exportData.push([`- ${ans.trim()}`]); // ใส่ข้อเสนอแนะ 1 บรรทัด (Enter ได้เซลล์ไม่แตก)
+             hasAns = true; 
+         } 
+     });
+     if(!hasAns) exportData.push(["- ไม่มีข้อเสนอแนะ -"]); 
+     exportData.push([]); // เว้น 1 บรรทัด
   });
 
-  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Evaluation_Report_${new Date().getTime()}.csv`; link.click();
+  // 🪄 เสกเป็นไฟล์ Excel (.xlsx) ด้วย SheetJS
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(exportData);
+  XLSX.utils.book_append_sheet(wb, ws, "Evaluation_Report");
+  XLSX.writeFile(wb, `Evaluation_Report_${new Date().getTime()}.xlsx`);
 }
 
 // ==========================================
