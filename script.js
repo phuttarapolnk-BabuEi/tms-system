@@ -1178,7 +1178,7 @@ async function fetchAssessmentLinks() {
   const tbody = document.getElementById('assessment-links-body');
   if (!tbody) return;
   
-  tbody.innerHTML = '<tr><td colspan="2" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูลลิงก์...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="2" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
   
   try {
     const res = await callAPI('getAssessmentConfig'); 
@@ -1188,21 +1188,22 @@ async function fetchAssessmentLinks() {
       
       // ดักกรณีไม่มีข้อมูล
       if (!res.data || res.data.length === 0) {
-         tbody.innerHTML = '<tr><td colspan="2" class="text-muted text-center py-4">ไม่พบข้อมูลลิงก์ในระบบ</td></tr>';
+         tbody.innerHTML = '<tr><td colspan="2" class="text-muted text-center py-4">ไม่พบข้อมูลในระบบ</td></tr>';
          return;
       }
 
-      // วนลูปสร้างแถวตารางแบบ Hyperlink ธรรมดา
+      // วนลูปสร้างแถวตาราง
       res.data.forEach((row, index) => {
         // ข้ามแถว Header ถ้าฝั่ง GAS ส่งมา
         if(row[0] === "กลุ่ม" || row[0] === "" || row[0] === "URL") return; 
 
+        // 💡 ปรับ UI เป็นปุ่มพร้อมไอคอน ซ่อนลิงก์เพื่อความสะอาดตาและเป็นทางการ
         tbody.innerHTML += `
           <tr>
-            <td class="fw-bold text-secondary fs-6">กลุ่มที่ ${row[0]}</td>
-            <td class="text-start">
-              <a href="${row[1]}" target="_blank" class="text-primary text-decoration-underline text-break" style="word-break: break-all;">
-                ${row[1]}
+            <td class="fw-bold text-secondary fs-6 align-middle">กลุ่มที่ ${row[0]}</td>
+            <td class="text-start align-middle">
+              <a href="${row[1]}" target="_blank" class="btn btn-sm btn-primary rounded-pill px-4 shadow-sm fw-bold" style="letter-spacing: 0.5px; transition: all 0.2s;">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> เข้าสู่ระบบจัดการข้อมูล
               </a>
             </td>
           </tr>
