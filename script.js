@@ -1,5 +1,5 @@
 // ==========================================
-// 📌 นำ URL จาก Google Apps Script มาวางในเครื่องหมายคำพูดด้านล่างนี้
+// 📌 1. ตั้งค่าการเชื่อมต่อ API (แก้ไข URL ให้ตรงกับที่ Deploy)
 // ==========================================
 const API_URL = "https://script.google.com/macros/s/AKfycbyk2rVpectedQjbsx8mNpWKPvzh-FhAgy2-eQpL7UYQ_-cKmtDneIFFeNHHfami_IPx/exec";
 
@@ -1172,7 +1172,7 @@ async function saveSpeakerConfigFromUI() {
 }
 
 // ==========================================
-// 📌 Admin & Staff: ดึงข้อมูลลิงก์ Assessment_Config (แบบ Hyperlink)
+// 📌 Admin & Staff: ดึงข้อมูลลิงก์ Assessment_Config (ฉบับ UI/UX ทางการและสะอาดตา)
 // ==========================================
 async function fetchAssessmentLinks() {
   const tbody = document.getElementById('assessment-links-body');
