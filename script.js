@@ -723,12 +723,11 @@ function renderPaginationControls(totalPages, role = 'admin') {
 }
 function changePage(page) { currentPage = page; renderPaginatedTable(); }
 
-function exportProgressTableToCSV() { // คงชื่อฟังก์ชันเดิมไว้ ปุ่ม HTML จะได้ไม่พัง
+function exportProgressTableToCSV() { 
   if (!filteredProgressData || filteredProgressData.length === 0) return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับนำออก', 'warning');
   
-  let exportData = []; // สร้างกล่องเตรียมเก็บข้อมูลลง Excel
+  let exportData = []; 
 
-  // --- สร้างหัวตาราง (Header) ---
   let headerRow = ["รหัส", "ชื่อ-สกุล", "คลัสเตอร์", "กลุ่ม"];
   let totalSlots = 0;
   if (globalSchedule && globalSchedule.length > 0) {
@@ -742,9 +741,8 @@ function exportProgressTableToCSV() { // คงชื่อฟังก์ชั
     });
   }
   headerRow.push("รวมเวลา (ครั้ง)", "ร้อยละ (%)", "Pre-Test", "ประเมินวิทยากร", "Post-Test", "ความพึงพอใจโครงการ");
-  exportData.push(headerRow); // ใส่หัวตารางลงไปแถวแรก
+  exportData.push(headerRow); 
 
-  // --- สร้างข้อมูลแต่ละคน (Data Rows) ---
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; 
@@ -769,10 +767,9 @@ function exportProgressTableToCSV() { // คงชื่อฟังก์ชั
     const evalProject = surv.project ? "ประเมินแล้ว" : "รอประเมิน";
 
     rowData.push(count, `${percentage}%`, preScore, evalSpeaker, postScore, evalProject);
-    exportData.push(rowData); // ใส่ข้อมูลลงไปทีละแถว
+    exportData.push(rowData); 
   });
   
-  // 🪄 เสกเป็นไฟล์ Excel (.xlsx) ด้วย SheetJS
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(exportData);
   XLSX.utils.book_append_sheet(wb, ws, "Matrix_Report");
@@ -979,7 +976,7 @@ function renderEvaluationDetail() {
   container.innerHTML = html;
 }
 
-function exportEvaluationToCSV() { // คงชื่อฟังก์ชันเดิมไว้ ปุ่ม HTML จะได้ไม่พัง
+function exportEvaluationToCSV() { 
   const targetId = document.getElementById('eval-target-select').value;
   const selectObj = document.getElementById('eval-target-select'); const targetName = selectObj.options[selectObj.selectedIndex].text;
   if(!targetId || !globalEvalData) return;
@@ -991,14 +988,12 @@ function exportEvaluationToCSV() { // คงชื่อฟังก์ชัน
   const categories = [...new Set(targetQuestions.map(q => q.category))];
   const interpret = (m) => { if(m >= 4.5) return 'มากที่สุด'; if(m >= 3.5) return 'มาก'; if(m >= 2.5) return 'ปานกลาง'; if(m >= 1.5) return 'น้อย'; return 'ปรับปรุง'; };
 
-  let exportData = []; // สร้างกล่องเตรียมเก็บข้อมูลลง Excel
+  let exportData = []; 
 
-  // --- ส่วนหัวรายงาน ---
   exportData.push([`รายงานผลการประเมิน: ${targetName}`]);
   exportData.push([`จำนวนผู้ประเมิน: ${targetSurveys.length} คน`]);
-  exportData.push([]); // เว้น 1 บรรทัด
+  exportData.push([]); 
 
-  // --- ตอนที่ 1: ข้อมูลพื้นฐาน ---
   const choiceCategories = categories.filter(cat => targetQuestions.some(q => q.category === cat && q.inputType === 'CHOICE'));
   if(choiceCategories.length > 0) {
       exportData.push(["ตอนที่ 1: ข้อมูลพื้นฐาน"]);
@@ -1014,10 +1009,9 @@ function exportEvaluationToCSV() { // คงชื่อฟังก์ชัน
            });
         });
       });
-      exportData.push([]); // เว้น 1 บรรทัด
+      exportData.push([]); 
   }
 
-  // --- ตอนที่ 2: ระดับความพึงพอใจ ---
   const ratingCategories = categories.filter(cat => targetQuestions.some(q => q.category === cat && q.inputType === 'RATING'));
   if (ratingCategories.length > 0) {
       exportData.push(["ตอนที่ 2: การประเมินระดับความพึงพอใจ"]);
@@ -1043,27 +1037,25 @@ function exportEvaluationToCSV() { // คงชื่อฟังก์ชัน
       const allCount = allRatingScores.length; let allMean = 0, allSd = 0;
       if(allCount > 0) { allMean = allRatingScores.reduce((a,b)=>a+b, 0) / allCount; if(allCount > 1) allSd = Math.sqrt(allRatingScores.reduce((a,b)=>a+Math.pow(b-allMean, 2), 0) / (allCount-1)); }
       exportData.push(["ภาพรวม", "สรุปรวมทุกด้าน", allCount, allCount > 0 ? allMean.toFixed(2) : '-', allCount > 0 ? allSd.toFixed(2) : '-', allCount > 0 ? interpret(allMean) : '-']);
-      exportData.push([]); // เว้น 1 บรรทัด
+      exportData.push([]); 
   }
 
-  // --- ตอนที่ 3: ข้อเสนอแนะปลายเปิด (จบปัญหาเรื่องกด Enter แล้วแถวขาด!) ---
   exportData.push(["ตอนที่ 3: ข้อเสนอแนะปลายเปิด"]);
   const textQuestions = targetQuestions.filter(q => q.inputType === 'TEXT');
   textQuestions.forEach(q => {
-     exportData.push([q.text]); // ชื่อคำถาม
+     exportData.push([q.text]); 
      let hasAns = false;
      targetSurveys.forEach(s => { 
          const ans = s.answers[q.q_id]; 
          if(ans && ans.trim() !== '') { 
-             exportData.push([`- ${ans.trim()}`]); // ใส่ข้อเสนอแนะ 1 บรรทัด (Enter ได้เซลล์ไม่แตก)
+             exportData.push([`- ${ans.trim()}`]); 
              hasAns = true; 
          } 
      });
      if(!hasAns) exportData.push(["- ไม่มีข้อเสนอแนะ -"]); 
-     exportData.push([]); // เว้น 1 บรรทัด
+     exportData.push([]); 
   });
 
-  // 🪄 เสกเป็นไฟล์ Excel (.xlsx) ด้วย SheetJS
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(exportData);
   XLSX.utils.book_append_sheet(wb, ws, "Evaluation_Report");
@@ -1177,4 +1169,49 @@ async function saveSpeakerConfigFromUI() {
   }
   const res = await callAPI('saveRawSpeakerConfig', { configData: newConfig });
   if (res.status === 'success') Swal.fire('สำเร็จ', res.message, 'success'); else Swal.fire('ข้อผิดพลาด', res.message, 'error');
+}
+
+// ==========================================
+// 📌 Admin & Staff: ดึงข้อมูลลิงก์ Assessment_Config (แบบ Hyperlink)
+// ==========================================
+async function fetchAssessmentLinks() {
+  const tbody = document.getElementById('assessment-links-body');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '<tr><td colspan="2" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูลลิงก์...</td></tr>';
+  
+  try {
+    const res = await callAPI('getAssessmentConfig'); 
+    
+    if (res.status === 'success') {
+      tbody.innerHTML = ''; 
+      
+      // ดักกรณีไม่มีข้อมูล
+      if (!res.data || res.data.length === 0) {
+         tbody.innerHTML = '<tr><td colspan="2" class="text-muted text-center py-4">ไม่พบข้อมูลลิงก์ในระบบ</td></tr>';
+         return;
+      }
+
+      // วนลูปสร้างแถวตารางแบบ Hyperlink ธรรมดา
+      res.data.forEach((row, index) => {
+        // ข้ามแถว Header ถ้าฝั่ง GAS ส่งมา
+        if(row[0] === "กลุ่ม" || row[0] === "" || row[0] === "URL") return; 
+
+        tbody.innerHTML += `
+          <tr>
+            <td class="fw-bold text-secondary fs-6">กลุ่มที่ ${row[0]}</td>
+            <td class="text-start">
+              <a href="${row[1]}" target="_blank" class="text-primary text-decoration-underline text-break" style="word-break: break-all;">
+                ${row[1]}
+              </a>
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      tbody.innerHTML = `<tr><td colspan="2" class="text-danger text-center py-4">ข้อผิดพลาด: ${res.message}</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="2" class="text-danger text-center py-4">ขัดข้องทางเทคนิคในการเชื่อมต่อข้อมูล</td></tr>`;
+  }
 }
