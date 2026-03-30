@@ -123,7 +123,6 @@ async function loadAttendanceUI() {
           const slotKey = day.dayNo + '_' + slot.id;
           const isCheckedIn = checkedInSlots && checkedInSlots.includes(slotKey); 
 
-          // 📌 จุดอัปเดต: ถ้า Expired จะเป็นปุ่มสีเหลือง และกดสายได้
           if (isCheckedIn) {
              html += `<button class="btn btn-secondary shadow-sm rounded-pill px-3 opacity-75" disabled><i class="bi bi-check2-all"></i> ${slot.label} (ลงแล้ว) <br><small class="fw-normal">${slot.start} - ${slot.end}</small></button>`;
           } else if (isActive) {
@@ -142,13 +141,12 @@ async function loadAttendanceUI() {
   } catch (e) { container.innerHTML = `<div class="text-danger small">ขัดข้องทางเทคนิค</div>`; }
 }
 
-// 📌 จุดอัปเดต: รับค่า isLate เพื่อแนบแท็ก [สาย] ไปบันทึก
 async function checkInModal(dayNo, timeSlot, isLate = false) {
   const titleText = isLate ? `ลงเวลา (${timeSlot}) - สาย` : `ลงเวลา (${timeSlot})`;
   const { value: note } = await Swal.fire({ title: titleText, input: 'textarea', inputPlaceholder: 'พิมพ์เป้าหมาย/สะท้อนผล...', showCancelButton: true, confirmButtonText: 'บันทึกเวลา' });
   
   if (note !== undefined) {
-    const finalNote = isLate ? '[สาย] ' + note : note; // แนบแท็กไปเก็บใน Note 
+    const finalNote = isLate ? '[สาย] ' + note : note; 
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const res = await callAPI('recordAttendance', { personalId: currentUser.personal_id, dayNo: dayNo, timeSlot: timeSlot, note: finalNote });
     if (res.status === 'success') { Swal.fire('สำเร็จ', res.message, 'success'); loadAttendanceUI(); } 
@@ -209,19 +207,46 @@ function renderExamUI(examData, testType) {
 
   Swal.fire({
     title: title, html: html, width: '800px', showCancelButton: true, confirmButtonText: 'ส่งคำตอบ', cancelButtonText: 'ยกเลิก', customClass: { popup: 'rounded-4 bg-light' },
-    preConfirm: () => {
+    didOpen: () => {
+      const form = document.getElementById('examForm');
+      const draftKey = `exam_draft_${currentUser.personal_id}_${testType}`;
+      
+      let savedDraft = {};
+      try { savedDraft = JSON.parse(localStorage.getItem(draftKey)) || {}; } catch(e){}
+      for (let qId in savedDraft) {
+         const radio = form.querySelector(`input[name="${qId}"][value="${savedDraft[qId]}"]`);
+         if(radio) radio.checked = true;
+      }
+      
+      form.addEventListener('change', () => {
+         const currentAnswers = Object.fromEntries(new FormData(form).entries());
+         localStorage.setItem(draftKey, JSON.stringify(currentAnswers));
+      });
+    },
+    preConfirm: async () => {
       const form = document.getElementById('examForm');
       if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบข้อสอบให้ครบทุกข้อ'); return false; }
-      return Object.fromEntries(new FormData(form).entries()); 
+      const answers = Object.fromEntries(new FormData(form).entries());
+
+      Swal.showLoading(); 
+      try {
+        const res = await callAPI('submitTestScore', { personalId: currentUser.personal_id, testType: testType, answers: answers });
+        if (res.status === 'success') {
+          localStorage.removeItem(`exam_draft_${currentUser.personal_id}_${testType}`); 
+          return res; 
+        } else {
+          Swal.showValidationMessage(`⚠️ ${res.message} (โปรดรอสักครู่แล้วกดส่งใหม่)`);
+          return false; 
+        }
+      } catch (err) {
+        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอ 5 วินาทีแล้วกดส่งใหม่ครับ`);
+        return false; 
+      }
     }
-  }).then(async (result) => {
+  }).then((result) => {
     if (result.isConfirmed) {
-      Swal.fire({ title: 'กำลังตรวจคำตอบ...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-      const res = await callAPI('submitTestScore', { personalId: currentUser.personal_id, testType: testType, answers: result.value });
-      if (res.status === 'success') {
-        Swal.fire({ icon: 'success', title: 'ส่งคำตอบสำเร็จ!', text: res.message, confirmButtonText: 'ยอดเยี่ยม' });
-        if(document.getElementById('admin-view').classList.contains('d-block')) fetchProgressData(); 
-      } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
+      Swal.fire({ icon: 'success', title: 'ส่งคำตอบสำเร็จ!', text: result.value.message, confirmButtonText: 'ยอดเยี่ยม' });
+      if(document.getElementById('admin-view').classList.contains('d-block')) fetchProgressData(); 
     }
   });
 }
@@ -306,17 +331,50 @@ function renderSurveyUI(surveyData, targetId, title) {
 
   Swal.fire({
     title: title, html: html, width: '800px', showCancelButton: true, confirmButtonText: 'ส่งแบบประเมิน', customClass: { popup: 'rounded-4 bg-light' },
-    preConfirm: () => {
+    didOpen: () => {
+      const form = document.getElementById('satisfactionForm');
+      const draftKey = `survey_draft_${currentUser.personal_id}_${targetId}`;
+      
+      let savedDraft = {};
+      try { savedDraft = JSON.parse(localStorage.getItem(draftKey)) || {}; } catch(e){}
+      for (let qId in savedDraft) {
+         const val = savedDraft[qId];
+         const radio = form.querySelector(`input[name="${qId}"][value="${val}"]`);
+         if (radio) radio.checked = true;
+         const textarea = form.querySelector(`textarea[name="${qId}"]`);
+         if (textarea) textarea.value = val;
+      }
+      
+      const saveDraft = () => {
+         const currentAnswers = Object.fromEntries(new FormData(form).entries());
+         localStorage.setItem(draftKey, JSON.stringify(currentAnswers));
+      };
+      form.addEventListener('change', saveDraft);
+      form.addEventListener('input', saveDraft);
+    },
+    preConfirm: async () => {
       const form = document.getElementById('satisfactionForm');
       if (!form.checkValidity()) { Swal.showValidationMessage('กรุณาตอบแบบประเมินให้ครบทุกข้อ'); return false; }
-      return Object.fromEntries(new FormData(form).entries());
+      const answers = Object.fromEntries(new FormData(form).entries());
+
+      Swal.showLoading();
+      try {
+        const res = await callAPI('submitSurvey', { personalId: currentUser.personal_id, targetId: targetId, answers: answers });
+        if (res.status === 'success') {
+          localStorage.removeItem(`survey_draft_${currentUser.personal_id}_${targetId}`); 
+          return res;
+        } else {
+          Swal.showValidationMessage(`⚠️ ${res.message} (โปรดรอสักครู่แล้วกดส่งใหม่)`);
+          return false; 
+        }
+      } catch(e) {
+        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอ 5 วินาทีแล้วกดส่งใหม่ครับ`);
+        return false; 
+      }
     }
-  }).then(async (result) => { 
+  }).then((result) => { 
     if (result.isConfirmed) {
-      Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
-      const res = await callAPI('submitSurvey', { personalId: currentUser.personal_id, targetId: targetId, answers: result.value });
-      if (res.status === 'success') Swal.fire('สำเร็จ!', res.message, 'success');
-      else Swal.fire('ข้อผิดพลาด', res.message, 'error');
+      Swal.fire('สำเร็จ!', result.value.message, 'success');
     }
   });
 }
@@ -329,7 +387,7 @@ async function fetchMentorData() {
   const tTraineeBody = document.getElementById('mentor-trainees-body');
   const linkContainer = document.getElementById('mentor-link-container');
   
-  if(tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
   if(tTraineeBody) tTraineeBody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังโหลดรายชื่อ...</td></tr>';
   
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
@@ -380,7 +438,7 @@ async function fetchMentorData() {
     renderMentorChart(); filterMentorTable(); 
   } 
   else { 
-    if(tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
     if(tTraineeBody) tTraineeBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
   }
 }
@@ -393,6 +451,7 @@ function renderMentorChart() {
   if (mentorChartInstance) mentorChartInstance.destroy();
   mentorChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['รอบเช้า', 'รอบบ่าย', 'รอบเย็น', 'สะท้อนผล'], datasets: [{ label: 'ยอดลงเวลา (ครั้ง)', data: [counts.Morning, counts.Afternoon, counts.Evening, counts.Checkout], backgroundColor: ['#0d6efd', '#ffc107', '#fd7e14', '#198754'], borderRadius: 5 }] }, options: { responsive: true, maintainAspectRatio: false } });
 }
+
 function filterMentorTable() {
   const keywordObj = document.getElementById('mentor-search');
   const dayObj = document.getElementById('mentor-filter-day');
@@ -409,7 +468,6 @@ function renderMentorPaginatedTable() {
   if(!tbody) return;
   tbody.innerHTML = '';
   
-  // 📌 เปลี่ยน colspan เป็น 6 เพราะมีคอลัมน์หมายเหตุเพิ่มมา
   if (filteredMentorData.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>'; return; }
   
   const startIdx = (mentorCurrentPage - 1) * rowsPerPage; const paginatedItems = filteredMentorData.slice(startIdx, startIdx + rowsPerPage);
@@ -419,7 +477,6 @@ function renderMentorPaginatedTable() {
      const isLate = log.note && log.note.includes('[สาย]');
      const lateBadge = isLate ? `<span class="badge bg-warning text-dark ms-2">สาย</span>` : '';
      
-     // 📌 ตัดคำว่า [สาย] ออกจากข้อความหมายเหตุเวลาแสดงผล จะได้ดูเนียนๆ ครับ
      let displayNote = log.note ? log.note.replace('[สาย]', '').trim() : '-';
      if (displayNote === '') displayNote = '-';
 
@@ -438,7 +495,6 @@ function renderMentorPaginatedTable() {
   document.getElementById('mentor-pagination-info').innerText = `แสดง ${startIdx + 1} ถึง ${Math.min(startIdx + rowsPerPage, filteredMentorData.length)} จาก ${filteredMentorData.length} รายการ`;
   renderPaginationControls(Math.ceil(filteredMentorData.length / rowsPerPage), 'mentor');
 }
-
 function changeMentorPage(page) { mentorCurrentPage = page; renderMentorPaginatedTable(); }
 
 // ==========================================
@@ -517,7 +573,6 @@ function renderPaginatedTable() {
   const startIdx = (currentPage - 1) * rowsPerPage;
   const paginatedItems = filteredProgressData.slice(startIdx, startIdx + rowsPerPage);
 
-  // 📌 จุดอัปเดต: เปลี่ยน Late ให้เป็นเครื่องหมายถูกสีเหลือง
   const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5" title="มาปกติ"></i>'; 
   const crossMark = '<span class="text-muted opacity-25">-</span>';
   const lateMark = '<i class="bi bi-check-circle-fill text-warning fs-5" title="มาสาย"></i>'; 
@@ -532,7 +587,6 @@ function renderPaginatedTable() {
            let isEnd = (index === day.slots.length - 1) ? 'class="border-end"' : '';
            if (att[day.dayNo] && att[day.dayNo][slot.id]) { 
                count++; 
-               // 📌 ถ้าสถานะเป็น LATE ให้ใส่เครื่องหมายถูกสีเหลือง
                if (att[day.dayNo][slot.id] === 'LATE') {
                   attendanceHtml += `<td ${isEnd}>${lateMark}</td>`; 
                } else {
@@ -599,10 +653,9 @@ function exportProgressTableToCSV() {
       });
     });
   }
-  csvHeader += `"รวม (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
+  csvHeader += `"รวมเวลา (ครั้ง)","ร้อยละ (%)","Pre-Test","ประเมินวิทยากร","Post-Test","ความพึงพอใจโครงการ"\n`;
   let csvContent = csvHeader;
 
-  // 📌 จุดอัปเดต: ถ้าเป็น LATE ให้ใส่ใน Excel ว่า "สาย"
   filteredProgressData.forEach(p => {
     const att = p.attendance || {}; const test = p.testScore || {}; const surv = p.survey || { speakersEvaluated: [], project: false };
     let count = 0; let rowCsv = `"${p.id}","${p.name}","${p.cluster || '-'}","${p.group}",`;
