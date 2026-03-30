@@ -239,7 +239,7 @@ function renderExamUI(examData, testType) {
           return false; 
         }
       } catch (err) {
-        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอ 5 วินาทีแล้วกดส่งใหม่ครับ`);
+        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอสักครู่แล้วกดส่งใหม่ครับ`);
         return false; 
       }
     }
@@ -368,7 +368,7 @@ function renderSurveyUI(surveyData, targetId, title) {
           return false; 
         }
       } catch(e) {
-        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอ 5 วินาทีแล้วกดส่งใหม่ครับ`);
+        Swal.showValidationMessage(`⚠️ คิวระบบเต็มชั่วคราว โปรดรอสักครู่แล้วกดส่งใหม่ครับ`);
         return false; 
       }
     }
@@ -388,13 +388,18 @@ async function fetchMentorData() {
   const linkContainer = document.getElementById('mentor-link-container');
   
   if(tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังดึงข้อมูล...</td></tr>';
-  if(tTraineeBody) tTraineeBody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังโหลดรายชื่อ...</td></tr>';
+  if(tTraineeBody) {
+     const thead = tTraineeBody.closest('table').querySelector('thead');
+     const colCount = thead.querySelectorAll('th').length || 5;
+     tTraineeBody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังโหลดข้อมูลกลุ่ม...</td></tr>`;
+  }
   
   const res = await callAPI('getMentorData', { mentorId: currentUser.personal_id });
   
   if (res.status === 'success') { 
     globalMentorData = res.data; 
     
+    // 1. จัดการลิงก์
     if (linkContainer) {
        if (res.mentorLink && res.mentorLink.trim() !== '') {
           linkContainer.innerHTML = `<a href="${res.mentorLink}" target="_blank" class="btn btn-primary rounded-pill shadow-sm fw-bold px-4"><i class="bi bi-box-arrow-up-right"></i> เปิดลิงก์บันทึกคะแนน</a>`;
@@ -403,10 +408,81 @@ async function fetchMentorData() {
        }
     }
 
+    // 2. จัดการตารางรายชื่อลูกศิษย์ (Matrix Table)
     if (tTraineeBody) {
+       const thead = tTraineeBody.closest('table').querySelector('thead');
+       let totalSlots = 0;
+       
+       let topRow = `<tr>
+                      <th rowspan="2" class="align-middle" style="width: 60px;">ลำดับ</th>
+                      <th rowspan="2" class="align-middle text-start">ชื่อ-สกุล</th>
+                      <th rowspan="2" class="align-middle">สังกัด</th>
+                      <th rowspan="2" class="align-middle">คลัสเตอร์</th>
+                      <th rowspan="2" class="align-middle">กลุ่ม</th>`;
+       let bottomRow = `<tr>`;
+
+       if (res.schedule && res.schedule.length > 0) {
+         res.schedule.forEach(day => {
+            const slotsCount = day.slots ? day.slots.length : 0;
+            totalSlots += slotsCount;
+            const thDate = formatThaiDate(day.date);
+            topRow += `<th colspan="${slotsCount}" class="align-middle">วันที่ ${day.dayNo} <br><small class="fw-normal">(${thDate})</small></th>`;
+            
+            if (day.slots) {
+               day.slots.forEach(slot => {
+                  let slotName = slot.id === 'Morning' ? 'เช้า' : slot.id === 'Afternoon' ? 'บ่าย' : slot.id === 'Evening' ? 'เย็น' : slot.id === 'Checkout' ? 'สะท้อนผล' : slot.label;
+                  bottomRow += `<th class="fw-normal border-top" style="background-color: rgba(0,0,0,0.02);">${slotName}</th>`;
+               });
+            }
+         });
+       } else {
+          totalSlots = 1; topRow += `<th colspan="1">ข้อมูลตารางเวลา</th>`; bottomRow += `<th>-</th>`;
+       }
+
+       topRow += `<th rowspan="2" class="align-middle border-start" style="background-color: rgba(0,0,0,0.05);">รวม<br>(ครั้ง)</th>
+                  <th rowspan="2" class="align-middle border-end" style="background-color: rgba(0,0,0,0.05);">ร้อยละ<br>(%)</th></tr>`;
+       bottomRow += `</tr>`;
+       thead.innerHTML = topRow + bottomRow;
+
+       let attMap = {};
+       res.data.forEach(log => {
+          if(!attMap[log.personal_id]) attMap[log.personal_id] = {};
+          if(!attMap[log.personal_id][log.day_no]) attMap[log.personal_id][log.day_no] = {};
+          attMap[log.personal_id][log.day_no][log.time_slot] = (log.note && log.note.includes('[สาย]')) ? 'LATE' : 'ONTIME';
+       });
+
+       const checkMark = '<i class="bi bi-check-circle-fill text-success fs-5" title="มาปกติ"></i>'; 
+       const crossMark = '<span class="text-muted opacity-25">-</span>';
+       const lateMark = '<i class="bi bi-check-circle-fill text-warning fs-5" title="มาสาย"></i>'; 
+
        tTraineeBody.innerHTML = '';
        if (res.traineesInfo && res.traineesInfo.length > 0) {
           res.traineesInfo.forEach((t, idx) => {
+             let count = 0; let attendanceHtml = '';
+             
+             if (res.schedule && res.schedule.length > 0) {
+               res.schedule.forEach(day => {
+                 if (day.slots) {
+                     day.slots.forEach((slot, index) => {
+                        let isEnd = (index === day.slots.length - 1) ? 'class="border-end"' : '';
+                        if (attMap[t.id] && attMap[t.id][day.dayNo] && attMap[t.id][day.dayNo][slot.id]) { 
+                            count++; 
+                            if (attMap[t.id][day.dayNo][slot.id] === 'LATE') {
+                               attendanceHtml += `<td ${isEnd}>${lateMark}</td>`; 
+                            } else {
+                               attendanceHtml += `<td ${isEnd}>${checkMark}</td>`; 
+                            }
+                        } else { 
+                            attendanceHtml += `<td ${isEnd}>${crossMark}</td>`; 
+                        }
+                     });
+                 }
+               });
+             }
+
+             const percentage = totalSlots > 0 ? Math.round((count / totalSlots) * 100) : 0;
+             const badgeColor = percentage >= 80 ? 'bg-success' : (percentage >= 50 ? 'bg-warning text-dark' : 'bg-danger');
+
              tTraineeBody.innerHTML += `
                <tr>
                  <td class="fw-bold text-muted">${idx + 1}</td>
@@ -414,14 +490,18 @@ async function fetchMentorData() {
                  <td>${t.area}</td>
                  <td>${t.cluster}</td>
                  <td><span class="badge bg-light text-dark border">กลุ่ม ${t.group}</span></td>
+                 ${attendanceHtml}
+                 <td class="fw-bold bg-light border-start">${count}</td>
+                 <td class="bg-light border-end"><span class="badge ${badgeColor}">${percentage}%</span></td>
                </tr>
              `;
           });
        } else {
-          tTraineeBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">ไม่พบข้อมูลผู้เข้าอบรมในความดูแล</td></tr>';
+          tTraineeBody.innerHTML = `<tr><td colspan="${7 + totalSlots}" class="text-center py-4 text-muted">ไม่พบข้อมูลผู้เข้าอบรมในความดูแล</td></tr>`;
        }
     }
     
+    // 3. ตัวกรองวันที่สำหรับตารางประวัติ
     const dayFilter = document.getElementById('mentor-filter-day');
     if (dayFilter) {
        const currentVal = dayFilter.value; 
@@ -439,7 +519,11 @@ async function fetchMentorData() {
   } 
   else { 
     if(tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
-    if(tTraineeBody) tTraineeBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+    if(tTraineeBody) {
+       const thead = tTraineeBody.closest('table').querySelector('thead');
+       const colCount = thead.querySelectorAll('th').length || 5;
+       tTraineeBody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-danger">เกิดข้อผิดพลาด</td></tr>`; 
+    }
   }
 }
 
